@@ -1,0 +1,298 @@
+{% extends "layout.html" %}
+
+{% block title %}Edit Anime Details{% endblock %}
+
+{% block main %}
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Edit Details for <strong>{{ anime[1] }}</strong></h2>
+
+    <form method="POST" action="{{ url_for('edit_detail', anime_id=anime[0]) }}" enctype="multipart/form-data">
+
+        <!-- Notes -->
+        <div class="mb-3">
+            <label for="extra_notes" class="form-label">Extra Notes</label>
+            <textarea class="form-control" name="extra_notes" id="extra_notes" rows="4">{{ detail[2] if detail else "" }}</textarea>
+        </div>
+
+        <!-- Lessons -->
+        <div class="mb-3">
+            <label for="lessons" class="form-label">Lessons / Takeaways</label>
+            <textarea class="form-control fst-italic" name="lessons" id="lessons" rows="3">{{ detail[7] if detail and detail|length > 7 else "" }}</textarea>
+            <div class="form-text">Displayed as a highlighted quote on the details page.</div>
+        </div>
+
+        <!-- Favorite Episodes -->
+        <div class="mb-3">
+            <label for="favorite_episodes" class="form-label">Favorite Episodes (optional)</label>
+            <input type="text" class="form-control" name="favorite_episodes" id="favorite_episodes"
+                   value="{{ detail[9] if detail and detail|length > 9 else '' }}">
+        </div>
+        <!-- Background Image URL -->
+        <div class="mb-3">
+            <label for="background_url" class="form-label">Background Image URL (optional)</label>
+            <input type="url" class="form-control" name="background_url" id="background_url"
+                value="{{ detail[11] if detail and detail|length > 11 else '' }}">
+        </div>
+
+        <!-- Poster URL -->
+        <div class="mb-3">
+            <label for="poster_url" class="form-label">Anime Poster URL (optional)</label>
+            <input type="url" class="form-control" name="poster_url" id="poster_url"
+                   value="{{ detail[10] if detail and detail|length > 10 else '' }}">
+        </div>
+
+        <!-- Image URLs -->
+        <div class="mb-3">
+            <label for="images" class="form-label">Image URLs (comma-separated)</label>
+            <input type="text" class="form-control" name="images" id="images"
+                   value="{{ image_list if image_list else '' }}">
+        </div>
+
+        <!-- Image Upload -->
+        <div class="mb-3">
+            <label for="image_uploads" class="form-label">Upload Fake Images</label>
+            <input type="file" class="form-control" name="image_uploads" id="image_uploads" accept="image/*" multiple>
+            <div class="form-text">You can upload multiple image files from your computer.</div>
+            <div class="form-text">That was a lie i have spent enough hours to fix this, this doesn't work god knows why...</div>
+        </div>
+
+        <!-- Sub Ratings -->
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label for="story_rating" class="form-label">Rating (0–10)</label>
+                <input type="number" step="0.1" min="0" max="10" class="form-control"
+                       name="story_rating" id="story_rating"
+                       value="{{ detail[4] if detail else '' }}">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="visual_rating" class="form-label">Animation Rating (0–10)</label>
+                <input type="number" step="0.1" min="0" max="10" class="form-control"
+                       name="visual_rating" id="visual_rating"
+                       value="{{ detail[5] if detail else '' }}">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="sound_rating" class="form-label">Story Rating (0–10)</label>
+                <input type="number" step="0.1" min="0" max="10" class="form-control"
+                       name="sound_rating" id="sound_rating"
+                       value="{{ detail[6] if detail else '' }}">
+            </div>
+        </div>
+
+        <!-- Mini Note for Rating -->
+        <div class="mb-3">
+            <label for="rating_note" class="form-label">Mini Rating Note (optional)</label>
+            <input type="text" class="form-control" name="rating_note" id="rating_note"
+                   value="{{ detail[8] if detail and detail|length > 8 else '' }}">
+            <div class="form-text">This will appear as a small note or dropdown beside the rating.</div>
+        </div>
+        <hr>
+        <h4 class="mb-3">Episodes</h4>
+        {% for ep in existing_episodes %}
+        <div class="border rounded p-3 mb-3 bg-white shadow-sm">
+            <h6>Episode {{ ep.number }}</h6>
+            <input type="hidden" name="existing_episode_ids" value="{{ ep.id }}">
+
+            <div class="mb-2">
+                <label>Episode Number</label>
+                <input type="number" name="episode_number_{{ ep.id }}" class="form-control" value="{{ ep.number }}" required>
+            </div>
+            <div class="mb-2">
+                <label>Episode Note</label>
+                <textarea name="episode_note_{{ ep.id }}" class="form-control">{{ ep.note }}</textarea>
+            </div>
+            <div class="mb-2">
+                <label>Episode Image URLs (comma separated)</label>
+                <input type="text" name="episode_images_{{ ep.id }}" class="form-control"
+                    value="{{ ep.images | join(', ') }}">
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <label>Overall Rating</label>
+                    <input type="number" name="episode_overall_{{ ep.id }}" class="form-control"
+                        value="{{ ep.overall }}" step="0.1" min="0" max="10">
+                </div>
+                <div class="col-md-4">
+                    <label>Animation Rating</label>
+                    <input type="number" name="episode_animation_{{ ep.id }}" class="form-control"
+                        value="{{ ep.animation }}" step="0.1" min="0" max="10">
+                </div>
+                <div class="col-md-4">
+                    <label>Story Rating</label>
+                    <input type="number" name="episode_story_{{ ep.id }}" class="form-control"
+                        value="{{ ep.story }}" step="0.1" min="0" max="10">
+                </div>
+            </div>
+
+            <div class="mt-2 text-end">
+                <label class="form-check-label text-danger">
+                    <input type="checkbox" class="form-check-input" name="delete_episode_{{ ep.id }}"> Delete this episode
+                </label>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div id="episodesContainer"></div>
+
+        <button type="button" class="btn btn-outline-success mb-3" id="addEpisodeBtn">➕ Add Episode</button>
+
+        <script>
+        document.getElementById("addEpisodeBtn").addEventListener("click", function () {
+            const container = document.getElementById("episodesContainer");
+            const index = container.children.length;
+
+            const html = `
+            <div class="border rounded p-3 mb-3 bg-light">
+                <h6>Episode ${index + 1}</h6>
+                <div class="mb-2">
+                    <label>Episode Number</label>
+                    <input type="number" name="episode_number" class="form-control" min="1" required>
+                </div>
+                <div class="mb-2">
+                    <label>Episode Note</label>
+                    <textarea name="episode_note" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="mb-2">
+                    <label>Episode Image URLs (comma separated)</label>
+                    <input type="text" name="episode_images" class="form-control">
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <label>Overall Rating</label>
+                        <input type="number" name="episode_overall" class="form-control" step="0.1" min="0" max="10">
+                    </div>
+                    <div class="col-md-4">
+                        <label>Animation Rating</label>
+                        <input type="number" name="episode_animation" class="form-control" step="0.1" min="0" max="10">
+                    </div>
+                    <div class="col-md-4">
+                        <label>Story Rating</label>
+                        <input type="number" name="episode_story" class="form-control" step="0.1" min="0" max="10">
+                    </div>
+                </div>
+            </div>`;
+
+            container.insertAdjacentHTML("beforeend", html);
+        });
+        </script>
+        <hr>
+        <!-- Waifu and husbandos -->
+        <h4 class="mb-3">Waifus</h4>
+
+        {% for w in existing_waifus %}
+        <div class="border rounded p-3 mb-3 bg-light">
+            <h6>Waifu {{ loop.index }}</h6>
+            <input type="hidden" name="existing_waifu_ids" value="{{ w.id }}">
+
+            <div class="mb-2">
+                <label>Name</label>
+                <input type="text" name="waifu_name_{{ w.id }}" class="form-control" value="{{ w.name }}">
+            </div>
+            <div class="mb-2">
+                <label>Photo URL</label>
+                <input type="url" name="waifu_image_{{ w.id }}" class="form-control" value="{{ w.image }}">
+            </div>
+            <div class="mb-2">
+                <label>Note</label>
+                <textarea name="waifu_note_{{ w.id }}" class="form-control" rows="2">{{ w.note }}</textarea>
+            </div>
+            <div class="text-end">
+                <label class="form-check-label text-danger">
+                    <input type="checkbox" class="form-check-input" name="delete_waifu_{{ w.id }}"> Delete
+                </label>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div id="waifusContainer"></div>
+        <button type="button" class="btn btn-outline-danger mb-3" id="addWaifuBtn">➕ Add Waifu</button>
+        <h4 class="mb-3">Husbandos</h4>
+
+        {% for h in existing_husbandos %}
+        <div class="border rounded p-3 mb-3 bg-light">
+            <h6>Husbando {{ loop.index }}</h6>
+            <input type="hidden" name="existing_husbando_ids" value="{{ h.id }}">
+
+            <div class="mb-2">
+                <label>Name</label>
+                <input type="text" name="husbando_name_{{ h.id }}" class="form-control" value="{{ h.name }}">
+            </div>
+            <div class="mb-2">
+                <label>Photo URL</label>
+                <input type="url" name="husbando_image_{{ h.id }}" class="form-control" value="{{ h.image }}">
+            </div>
+            <div class="mb-2">
+                <label>Note</label>
+                <textarea name="husbando_note_{{ h.id }}" class="form-control" rows="2">{{ h.note }}</textarea>
+            </div>
+            <div class="text-end">
+                <label class="form-check-label text-danger">
+                    <input type="checkbox" class="form-check-input" name="delete_husbando_{{ h.id }}"> Delete
+                </label>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div id="husbandosContainer"></div>
+        <button type="button" class="btn btn-outline-success mb-3" id="addHusbandoBtn">➕ Add Husbando</button>
+
+        <script>
+        document.getElementById("addHusbandoBtn").addEventListener("click", function () {
+            const container = document.getElementById("husbandosContainer");
+            const index = container.children.length;
+
+            const html = `
+                <div class="border rounded p-3 mb-3 bg-light">
+                    <h6>Husbando ${index + 1}</h6>
+                    <div class="mb-2">
+                        <label>Name</label>
+                        <input type="text" name="husbando_name" class="form-control">
+                    </div>
+                    <div class="mb-2">
+                        <label>Photo URL</label>
+                        <input type="url" name="husbando_image" class="form-control">
+                    </div>
+                    <div class="mb-2">
+                        <label>Note</label>
+                        <textarea name="husbando_note" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>`;
+            container.insertAdjacentHTML("beforeend", html);
+        });
+
+        document.getElementById("addWaifuBtn").addEventListener("click", function () {
+            const container = document.getElementById("waifusContainer");
+            const index = container.children.length;
+
+            const html = `
+                <div class="border rounded p-3 mb-3 bg-light">
+                    <h6>Waifu ${index + 1}</h6>
+                    <div class="mb-2">
+                        <label>Name</label>
+                        <input type="text" name="waifu_name" class="form-control">
+                    </div>
+                    <div class="mb-2">
+                        <label>Photo URL</label>
+                        <input type="url" name="waifu_image" class="form-control">
+                    </div>
+                    <div class="mb-2">
+                        <label>Note</label>
+                        <textarea name="waifu_note" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>`;
+            container.insertAdjacentHTML("beforeend", html);
+        });
+        </script>
+
+
+
+        <!-- Submit -->
+        <div class="text-center mt-4">
+            <button type="submit" class="btn btn-primary">📂 Save Details</button>
+            <a href="{{ url_for('detail', anime_id=anime[0]) }}" class="btn btn-secondary ms-2">← Back to Detail</a>
+        </div>
+    </form>
+    <hr class="my-5">
+
+</div>
+{% endblock %}

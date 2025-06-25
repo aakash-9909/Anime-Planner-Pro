@@ -1,0 +1,158 @@
+{% extends "layout.html" %}
+
+{% block title %}Preview Anime List{% endblock %}
+
+{% block main %}
+<h2 class="mb-4 text-center">My Anime List</h2>
+
+{% if anime_list %}
+<div class="form-check form-switch mb-4 d-flex justify-content-center">
+    <input class="form-check-input" type="checkbox" role="switch" id="sortToggle"
+           onchange="location.href=this.checked ? '?sort_by_rating=1' : window.location.pathname;"
+           {% if sort_active %}checked{% endif %}>
+    <label class="form-check-label ms-2" for="sortToggle">
+        Sort by rating (high to low)
+    </label>
+</div>
+
+<div class="d-flex justify-content-center mb-4 gap-3 flex-wrap">
+    <a href="{{ url_for('export') }}" class="btn btn-outline-primary">📤 Export CSV</a>
+    <input type="text" id="searchBox" class="form-control" placeholder="Search anime..." style="max-width: 300px;">
+    <button class="btn btn-outline-secondary" id="toggleEdit">🔧 Show Edit/Delete</button>
+    <button class="btn btn-outline-secondary" id="toggleDetail">✨ Show View/Add</button>
+</div>
+
+<div class="container-fluid px-0" id="animeList">
+    {% for anime in anime_list %}
+    <div class="mb-4 anime-card" id="anime-{{ anime[0] }}">
+        <div class="card text-white shadow-lg position-relative overflow-hidden border-0 mx-auto"
+             style="
+                 border-radius: 1.5rem;
+                 min-height: 400px;
+                 background-size: cover;
+                 background-position: center;
+                 background-image: url('{{ anime[7] if anime[7] else url_for('static', filename='default.jpg') }}');
+                 max-width: 1200px;
+                 width: 100%;
+
+
+             ">
+            <!-- Edit & Delete Controls -->
+            <div class="position-absolute top-0 end-0 p-2 d-flex gap-1 edit-controls">
+                <form method="post" action="{{ url_for('delete', anime_id=anime[0]) }}" onsubmit="return confirm('Delete this anime?');">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                </form>
+                <a href="{{ url_for('edit', anime_id=anime[0]) }}" class="btn btn-sm btn-light"><i class="bi bi-pencil"></i></a>
+            </div>
+
+            <!-- Date Badge -->
+            {% if anime[4] %}
+            <div class="position-absolute top-0 start-0 p-2">
+                <span class="badge bg-dark" title="{{ anime[4] }}">{{ anime[4]|datetimeformat('%b %Y') }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Content -->
+            <div class="card-body bg-dark bg-opacity-75 text-white rounded-4 m-3">
+                <h4 class="card-title">{{ anime[1] }}</h4>
+                <p class="card-text mb-1">⭐ <strong>{{ anime[2] }}/10</strong></p>
+                {% if anime[3] %}
+                    <p class="card-text"><strong>Thoughts:</strong> {{ anime[3] }}</p>
+                {% endif %}
+                {% if anime[5] %}
+                    <p class="card-text"><strong>Sequel of:</strong> {{ anime[5] }}</p>
+                {% endif %}
+                {% if anime[6] %}
+                    <p class="card-text"><a class="text-info" href="{{ anime[6] }}" target="_blank">More Details</a></p>
+                {% endif %}
+                {% if anime[0] in detail_ids %}
+                    <!-- <p class="card-text"><a class="text-warning" href="{{ url_for('detail', anime_id=anime[0]) }}">📘 View Details</a></p> -->
+                {% endif %}
+
+                <!-- Detail Controls -->
+                <div class="position-absolute bottom-0 end-0 m-2 d-flex gap-2 detail-controls">
+                    {% if anime[0] in detail_ids %}
+                        <a href="{{ url_for('detail', anime_id=anime[0]) }}" class="btn btn-sm btn-light" title="View Details">🔍</a>
+                    {% endif %}
+                    <a href="{{ url_for('edit_detail', anime_id=anime[0]) }}" class="btn btn-sm btn-success" title="Add/Edit Details">➕</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted text-center">No anime entries yet. <a href="/add">Add your first anime</a>!</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .edit-controls {
+        display: none !important;
+    }
+    .edit-controls.show {
+        display: flex !important;
+    }
+    .detail-controls {
+        display: none !important;
+    }
+    .detail-controls.show {
+        display: flex !important;
+    }
+</style>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const searchBox = document.getElementById("searchBox");
+        const cards = document.querySelectorAll(".anime-card");
+        const toggleBtn = document.getElementById("toggleEdit");
+        const editControls = document.querySelectorAll(".edit-controls");
+        const detailToggleBtn = document.getElementById("toggleDetail");
+        const detailControls = document.querySelectorAll(".detail-controls");
+
+        let showEditControls = false;
+        let showDetailControls = false;
+
+        // Search
+        if (searchBox) {
+            searchBox.addEventListener("input", () => {
+                const term = searchBox.value.toLowerCase();
+                cards.forEach(card => {
+                    const text = card.textContent.toLowerCase();
+                    card.style.display = text.includes(term) ? "block" : "none";
+                });
+            });
+        }
+
+        // Edit toggle
+        if (toggleBtn) {
+            toggleBtn.addEventListener("click", () => {
+                showEditControls = !showEditControls;
+                editControls.forEach(el => el.classList.toggle("show", showEditControls));
+                toggleBtn.textContent = showEditControls ? "❌ Hide Edit/Delete" : "🔧 Show Edit/Delete";
+            });
+        }
+
+        // Detail toggle
+        if (detailToggleBtn) {
+            detailToggleBtn.addEventListener("click", () => {
+                showDetailControls = !showDetailControls;
+                detailControls.forEach(el => el.classList.toggle("show", showDetailControls));
+                detailToggleBtn.textContent = showDetailControls ? "❌ Hide View/Add" : "✨ Show View/Add";
+            });
+        }
+
+        // Scroll to hash
+        const hash = window.location.hash;
+        if (hash) {
+            const target = document.querySelector(hash);
+            if (target) {
+                setTimeout(() => {
+                    target.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 200);
+            }
+        }
+    });
+</script>
+{% endblock %}

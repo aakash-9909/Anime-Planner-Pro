@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+
+{% block title %}Welcome{% endblock %}
+
+{% block main %}
+<div class="text-center">
+    <h1 class="mb-4">Welcome to AnimePlanner 🌸</h1>
+    <p class="lead">Log your favorite anime, rate them, and reflect on what you watched!</p>
+    <div class="mt-4 d-grid gap-2 col-md-4 mx-auto">
+        <a href="/add" class="btn btn-outline-primary">Add a New Anime</a>
+        <a href="/preview" class="btn btn-primary">View My Anime List</a>
+    </div>
+</div>
+{% endblock %}

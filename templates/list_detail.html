@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+
+{% block title %}Detailed Anime List{% endblock %}
+
+{% block main %}
+<h2 class="mb-4 text-center">Detailed Anime List</h2>
+
+{% if anime_list %}
+    <div class="row justify-content-center">
+        {% for anime in anime_list %}
+        <div class="col-md-8 mb-4">
+            <div class="card shadow-lg border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-1">{{ anime[1] }}</h4>
+                        <a href="{{ url_for('detail', anime_id=anime[0]) }}" class="btn btn-sm btn-outline-primary">🔍 View Detail</a>
+                    </div>
+
+                    <p class="mb-1">⭐ <strong>{{ anime[2] if anime[2] else 'N/A' }}</strong> ({{ anime[2]|render_stars }})</p>
+                    {% if anime[3] %}<p class="mb-1"><strong>Thoughts:</strong> {{ anime[3] }}</p>{% endif %}
+                    {% if anime[4] %}<p class="mb-1"><strong>Release Date:</strong> {{ anime[4]|datetimeformat('%b %Y') }}</p>{% endif %}
+                    {% if anime[5] %}<p class="mb-1"><strong>Sequel of:</strong> {{ anime[5] }}</p>{% endif %}
+                    {% if anime[6] %}<p class="mb-1"><strong>More Info:</strong> <a href="{{ anime[6] }}" target="_blank">Link</a></p>{% endif %}
+
+                    {% if anime[8] %}<p class="mb-1"><strong>Extra Notes:</strong> {{ anime[8] }}</p>{% endif %}
+
+                    {% if anime[10] or anime[11] or anime[12] %}
+                    <ul class="mt-2">
+                        {% if anime[10] %}<li><strong>Story Rating:</strong> {{ anime[10] }}/10 {{ anime[10]|render_stars }}</li>{% endif %}
+                        {% if anime[11] %}<li><strong>Visual Rating:</strong> {{ anime[11] }}/10 {{ anime[11]|render_stars }}</li>{% endif %}
+                        {% if anime[12] %}<li><strong>Sound Rating:</strong> {{ anime[12] }}/10 {{ anime[12]|render_stars }}</li>{% endif %}
+                    </ul>
+                    {% endif %}
+
+                    {% if anime[9] %}
+                    <div class="mt-3">
+                        <strong>Images:</strong>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for img in anime[9]|safe|loads %}
+                            <img src="{{ img }}" alt="Image" class="img-thumbnail" style="max-height: 100px;">
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p class="text-center text-muted">No entries with details yet.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // enable JSON parsing for images
+    window.loads = JSON.parse;
+</script>
+{% endblock %}

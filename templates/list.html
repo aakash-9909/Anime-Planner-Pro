@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+
+{% block title %}Anime List{% endblock %}
+
+{% block main %}
+<h2 class="mb-4 text-center">Simplified Anime List</h2>
+
+<div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
+    <input type="text" id="searchBox" class="form-control" placeholder="Search anime..." style="max-width: 300px;">
+
+    <!-- Sort by field -->
+    <div class="btn-group">
+        <a href="{{ url_for('list_view', sort='date', order=order, filter=filter_null) }}"
+           class="btn btn-outline-primary {% if sort_by == 'date' %}active{% endif %}">
+           Sort by Date
+        </a>
+        <a href="{{ url_for('list_view', sort='rating', order=order, filter=filter_null) }}"
+           class="btn btn-outline-primary {% if sort_by == 'rating' %}active{% endif %}">
+           Sort by Rating
+        </a>
+    </div>
+
+    <!-- Sort order -->
+    <div class="btn-group">
+        <a href="{{ url_for('list_view', sort=sort_by, order='asc', filter=filter_null) }}"
+           class="btn btn-outline-secondary {% if order == 'asc' %}active{% endif %}">⬆ Asc</a>
+        <a href="{{ url_for('list_view', sort=sort_by, order='desc', filter=filter_null) }}"
+           class="btn btn-outline-secondary {% if order == 'desc' %}active{% endif %}">⬇ Desc</a>
+    </div>
+
+    <!-- Filter nulls not working null has so many issues i had rather set it to 0 -->
+    <!-- <div class="btn-group">
+        <a href="{{ url_for('list_view', sort=sort_by, order=order, filter='nonull') }}"
+           class="btn btn-outline-success {% if filter_null == 'nonull' %}active{% endif %}">Only Rated</a>
+        <a href="{{ url_for('list_view', sort=sort_by, order=order, filter='all') }}"
+           class="btn btn-outline-secondary {% if filter_null != 'nonull' %}active{% endif %}">Show All</a>
+    </div> -->
+</div>
+
+<ul class="list-group" id="animeList">
+    {% for anime in anime_list %}
+        <a href="/preview#anime-{{ anime[0] }}"
+           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center anime-entry">
+            <strong>{{ anime[1] }}</strong>
+            <span class="text-muted small">
+                {% if sort_by == 'rating' %}
+                    ⭐ {{ anime[2] if anime[2] else "N/A" }}
+                {% else %}
+                    {{ anime[3]|datetimeformat('%b %Y') if anime[3] else "No Date" }}
+                {% endif %}
+            </span>
+        </a>
+    {% endfor %}
+</ul>
+
+{% if not anime_list %}
+    <p class="text-muted text-center mt-4">No anime entries found.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const searchBox = document.getElementById("searchBox");
+    const items = document.querySelectorAll(".anime-entry");
+
+    searchBox.addEventListener("input", () => {
+        const term = searchBox.value.toLowerCase();
+        items.forEach(item => {
+            const title = item.textContent.toLowerCase();
+            item.style.display = title.includes(term) ? "flex" : "none";
+        });
+    });
+});
+</script>
+{% endblock %}

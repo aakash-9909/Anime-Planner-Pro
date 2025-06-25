@@ -1,0 +1,65 @@
+{% extends "layout.html" %}
+
+{% block title %}Add Anime{% endblock %}
+
+{% block main %}
+<h2 class="mb-4">Add a New Anime</h2>
+
+<!-- Sequel Sorting Toggle -->
+<!-- <form method="get" action="/add" class="mb-4 text-start mx-auto" style="max-width: 600px;">
+    <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="sortToggle"
+               name="sort_by_rating" onchange="this.form.submit()" {% if sort_active %}checked{% endif %}>
+        <label class="form-check-label" for="sortToggle">Sort sequel list by rating (high to low)</label>
+    </div>
+</form> -->
+
+<!-- Anime Add Form -->
+<form method="post" action="/add" class="text-start mx-auto" style="max-width: 600px;">
+    <div class="mb-3">
+        <label for="title" class="form-label">Anime Title</label>
+        <input type="text" class="form-control" id="title" name="title" required>
+    </div>
+    <div class="mb-3">
+        <label for="rating" class="form-label">Your Rating (1–10)</label>
+        <input type="number" class="form-control" id="rating" name="rating" step="0.001" min="1" max="12">
+    </div>
+    <div class="mb-3">
+        <label for="thoughts" class="form-label">Short Thoughts</label>
+        <textarea class="form-control" id="thoughts" name="thoughts" rows="2"></textarea>
+    </div>
+    <div class="mb-3">
+        <label for="date" class="form-label">Date Watched</label>
+        <input type="date" class="form-control" id="date" name="date">
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" value="1" id="no_date" name="no_date">
+            <label class="form-check-label" for="no_date">No date</label>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="sequel" class="form-label">Is Sequel of</label>
+        <select class="form-select" id="sequel" name="sequel">
+            <option value="">-- None --</option>
+            {% for name in sequel_list %}
+                <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="background_url" class="form-label">Background Image URL (optional)</label>
+        <input type="url" class="form-control" id="background_url" name="background_url">
+    </div>
+    <div class="mb-3">
+        <label for="details_url" class="form-label">More Details URL (optional)</label>
+        <input type="url" class="form-control" id="details_url" name="details_url">
+    </div>
+    <div class="d-grid">
+        <button type="submit" class="btn btn-primary">Add Anime</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/anime.js"></script>
+{% endblock %}

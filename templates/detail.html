@@ -1,0 +1,380 @@
+{% extends "layout.html" %}
+
+{% block title %}Anime Details{% endblock %}
+
+{% block main %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap">
+        <h2 class="fw-bold display-4 mb-3"
+            style="background: linear-gradient(to right, #00b4db, #0083b0);
+                   -webkit-background-clip: text;
+                   -webkit-text-fill-color: transparent;">
+            {{ anime[1] }}
+        </h2>
+
+        {% if detail and detail[10] %}
+        <div style="max-width: 220px;" class="ms-auto">
+            <img src="{{ detail[10] }}" class="img-fluid rounded shadow" alt="Anime Poster">
+        </div>
+        {% endif %}
+    </div>
+
+    {% if detail and detail[10] %}
+    <div class="card text-white mt-3 shadow border-0 overflow-hidden" style="position: relative;">
+        <div style="
+            background-image: url('{{ url_for('static', filename='images/card.jpg') }}');
+            background-size: cover;
+            background-position: center;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 1;
+            opacity: 0.9;">
+        </div>
+        <div class="card-body position-relative" style="z-index: 2;">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>📊 Rating:</strong> {{ anime[2] if anime[2] else "N/A" }} ({{ anime[2]|render_stars }})</p>
+                    <p class="mb-1"><strong>🥏R note: </strong> {{ detail[8] if detail[8] else "N/A" }}</p>
+
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>💬 Thoughts:</strong> {{ anime[3] or "No notes" }}</p>
+                    <p class="mb-1"><strong>📅 Watched on:</strong> {{ anime[4]|datetimeformat('%b %Y') if anime[4] else "No Date" }}</p>
+                    {% if anime[6] %}
+                    <p class="mb-1"><strong>🌐 More Info:</strong>
+                        <a href="{{ anime[6] }}" target="_blank" class="link-light text-decoration-underline">Link</a>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+    {% if detail %}
+    <hr>
+
+    <!-- Extra Notes -->
+   <div class="card p-4 mb-4 shadow-sm border-0 text-white" style="
+    background-image: url('{{ url_for('static', filename='images/extra_notes_bg.jpg') }}');
+    background-size: cover;
+    background-position: center;">
+    <h5 class="mb-2">📓 <strong>Extra Notes</strong></h5>
+    <p class="mb-0">{{ detail[2] or "None" }}</p>
+    </div>
+
+
+    {% if detail[7] %}
+    <div class="card p-4 mb-4 text-white border-0" style="
+        background-image: url('{{ url_for('static', filename='images/quote_bg.jpg') }}');
+        background-size: cover;
+        background-position: center;">
+        <blockquote class="blockquote mb-0 fst-italic">
+            “{{ detail[7] }}”
+        </blockquote>
+    </div>
+    {% endif %}
+
+
+    {% if detail[9] %}
+    <div class="alert alert-info mt-4 shadow-sm">
+        <strong>Favorite Episodes:</strong> {{ detail[9] }}
+    </div>
+    {% endif %}
+
+    <!-- Image Gallery -->
+    {% if images %}
+    <div class="mb-5">
+        <h5 class="mb-3"><i class="fas fa-images text-primary"></i> Image Gallery</h5>
+
+        <!-- Gallery Toggle -->
+        <div class="mb-3">
+            <div class="btn-group" role="group">
+                <button class="btn btn-outline-primary active" id="sliderBtn">Slider View</button>
+                <button class="btn btn-outline-secondary" id="gridBtn">Grid View</button>
+            </div>
+        </div>
+
+        <!-- Swiper Gallery -->
+        <div id="sliderGallery">
+            <div class="swiper mySwiper">
+                <div class="swiper-wrapper">
+                    {% for url in images %}
+                    <div class="swiper-slide">
+                        {% if url.startswith('http') %}
+                            <img src="{{ url }}" class="img-fluid rounded shadow" alt="Anime Image">
+                        {% else %}
+                            <img src="{{ url_for('static', filename=url) }}" class="img-fluid rounded shadow" alt="Uploaded Image">
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="swiper-button-next"></div>
+                <div class="swiper-button-prev"></div>
+                <div class="swiper-pagination"></div>
+            </div>
+        </div>
+
+        <!-- Grid Gallery -->
+        <div id="gridGallery" style="display: none;">
+            <div class="row g-3">
+                {% for url in images %}
+                <div class="col-6 col-md-4 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        {% if url.startswith('http') %}
+                            <img src="{{ url }}" class="card-img-top rounded" alt="Anime Image">
+                        {% else %}
+                            <img src="{{ url_for('static', filename=url) }}" class="card-img-top rounded" alt="Uploaded Image">
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Detailed Ratings -->
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-body">
+            <h5 class="card-title"><i class="fas fa-star-half-alt"></i> Detailed Ratings</h5>
+            <div class="row text-center">
+                <div class="col-md-4 mb-2">
+                    <div class="rating-box p-2 bg-light rounded">
+                        <h6>Overall</h6>
+                        <div class="fs-5 text-warning">{{ detail[4]|render_stars }}</div>
+                        <small class="text-muted">{{ detail[4] }}/10{% if detail[8] %}{% endif %}</small>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <div class="rating-box p-2 bg-light rounded">
+                        <h6>Animation</h6>
+                        <div class="fs-5 text-warning">{{ detail[5]|render_stars }}</div>
+                        <small class="text-muted">{{ detail[5] }}/10{% if detail[8] %}{% endif %}</small>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <div class="rating-box p-2 bg-light rounded">
+                        <h6>Story</h6>
+                        <div class="fs-5 text-warning">{{ detail[6]|render_stars }}</div>
+                        <small class="text-muted">{{ detail[6] }}/10{% if detail[8] %}{% endif %}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if episodes %}
+    <div class="accordion my-5" id="episodeAccordion">
+        <h5 class="mb-3">🎥 Episodes</h5>
+        {% for ep in episodes %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ loop.index }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                    Episode {{ ep.number }}
+                </button>
+            </h2>
+            <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}"
+                data-bs-parent="#episodeAccordion">
+                <div class="accordion-body">
+
+                    {% if ep.note %}
+                    <p><strong>Note:</strong> {{ ep.note }}</p>
+                    {% endif %}
+
+                    {% if ep.images %}
+                    <div class="row g-3 mb-3">
+                        {% for img in ep.images %}
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <img src="{{ img }}" class="img-fluid rounded shadow" alt="Episode Image">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row text-center">
+                        <div class="col-md-4 mb-2">
+                            <h6>Overall</h6>
+                            <div class="fs-5 text-warning">{{ ep.overall|render_stars }}</div>
+                            <small class="text-muted">{{ ep.overall }}/10</small>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <h6>Animation</h6>
+                            <div class="fs-5 text-warning">{{ ep.animation|render_stars }}</div>
+                            <small class="text-muted">{{ ep.animation }}/10</small>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <h6>Story</h6>
+                            <div class="fs-5 text-warning">{{ ep.story|render_stars }}</div>
+                            <small class="text-muted">{{ ep.story }}/10</small>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% else %}
+        <p class="text-muted">No extended details yet.</p>
+    {% endif %}
+
+
+    <!-- background url husbandos and waifus -->
+     <!-- You can format the background url of the page from here-->
+    {% if detail and detail[11] %}
+    <style>
+    body::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background:
+            linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+            url('{% if detail[11].startswith("http") %}{{ detail[11] }}{% else %}{{ url_for('static', filename=detail[11]) }}{% endif %}')
+            no-repeat center center fixed;
+        background-size: cover;
+        z-index: -1;
+    }
+    </style>
+    {% endif %}
+{% if husbandos %}
+<div class="mb-5">
+    <h5 class="fw-semibold mb-3 border-bottom pb-1" style="color: #e91e63;">
+        💖 Husbandos
+    </h5>
+    <div class="d-flex overflow-auto gap-4 py-2 px-1">
+        {% for h in husbandos %}
+        <div class="flex-shrink-0" style="width: 260px;">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden position-relative">
+                <div style="height: 450px;">
+                    {% if h.image %}
+                        {% if h.image.startswith('http') %}
+                        <img src="{{ h.image }}" class="w-100 h-100 rounded-4"
+                             style="object-fit: cover; object-position: top;" alt="Husbando Image">
+                        {% else %}
+                        <img src="{{ url_for('static', filename=h.image) }}" class="w-100 h-100 rounded-4"
+                             style="object-fit: cover; object-position: top;" alt="Husbando Image">
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="position-absolute bottom-0 w-100 text-center text-white px-2"
+                     style="text-shadow: 1px 1px 2px black; font-weight: bold;">
+                    {{ h.name }}
+                </div>
+            </div>
+            {% if h.note %}
+            <div class="text-white text-center small fst-italic mt-1 px-2 py-1 rounded-3"
+                 style="background-color: rgba(0, 0, 0, 0.6);"
+                 title="{{ h.note }}">
+                {{ h.note[:60] }}{% if h.note|length > 60 %}...{% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if waifus %}
+<div class="mb-5">
+    <h5 class="fw-semibold mb-3 border-bottom pb-1" style="color: #e91e63;">
+        💖 Waifus
+    </h5>
+    <div class="d-flex overflow-auto gap-4 py-2 px-1">
+        {% for w in waifus %}
+        <div class="flex-shrink-0" style="width: 260px;">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden position-relative">
+                <div style="height: 450px;">
+                    {% if w.image %}
+                        {% if w.image.startswith('http') %}
+                        <img src="{{ w.image }}" class="w-100 h-100 rounded-4"
+                             style="object-fit: cover; object-position: top;" alt="Waifu Image">
+                        {% else %}
+                        <img src="{{ url_for('static', filename=w.image) }}" class="w-100 h-100 rounded-4"
+                             style="object-fit: cover; object-position: top;" alt="Waifu Image">
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="position-absolute bottom-0 w-100 text-center text-white px-2"
+                     style="text-shadow: 1px 1px 2px black; font-weight: bold;">
+                    {{ w.name }}
+                </div>
+            </div>
+            {% if w.note %}
+            <div class="text-white text-center small fst-italic mt-1 px-2 py-1 rounded-3"
+                 style="background-color: rgba(0, 0, 0, 0.6);"
+                 title="{{ w.note }}">
+                {{ w.note[:60] }}{% if w.note|length > 60 %}...{% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+
+    <!-- Edit Details Button -->
+    <div class="text-center">
+        <a href="{{ url_for('edit_detail', anime_id=anime[0]) }}" class="btn btn-outline-primary">✏️ Edit Details</a>
+    </div>
+</div>
+
+<!-- Swiper Script -->
+<script>
+  const swiper = new Swiper(".mySwiper", {
+    slidesPerView: 1,
+    spaceBetween: 20,
+    loop: true,
+    pagination: {
+      el: ".swiper-pagination",
+      clickable: true,
+    },
+    navigation: {
+      nextEl: ".swiper-button-next",
+      prevEl: ".swiper-button-prev",
+    },
+    breakpoints: {
+      768: { slidesPerView: 2 },
+      992: { slidesPerView: 3 }
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const sliderBtn = document.getElementById("sliderBtn");
+    const gridBtn = document.getElementById("gridBtn");
+    const sliderGallery = document.getElementById("sliderGallery");
+    const gridGallery = document.getElementById("gridGallery");
+
+    sliderBtn.addEventListener("click", function () {
+      sliderGallery.style.display = "block";
+      gridGallery.style.display = "none";
+      sliderBtn.classList.add("active");
+      gridBtn.classList.remove("active");
+    });
+
+    gridBtn.addEventListener("click", function () {
+      sliderGallery.style.display = "none";
+      gridGallery.style.display = "block";
+      gridBtn.classList.add("active");
+      sliderBtn.classList.remove("active");
+    });
+  });
+</script>
+
+<script>
+    function scrollGallery(id, direction) {
+        const container = document.getElementById(id);
+        const scrollAmount = 300;
+        container.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+    }
+</script>
+
+
+{% endblock %}

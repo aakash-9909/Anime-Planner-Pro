@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block title %}Characters{% endblock %}
+
+{% block main %}
+<h2 class="mb-4 text-center">🌸 All Characters</h2>
+
+<!-- Search Form -->
+<form class="mb-4" method="get" action="{{ url_for('characters') }}">
+    <div class="input-group">
+        <input type="text" class="form-control" name="search" placeholder="Search by name" value="{{ search }}">
+        <button class="btn btn-outline-primary" type="submit">🔍 Search</button>
+    </div>
+</form>
+
+<!-- Waifus -->
+{% if waifus %}
+<h4 class="mb-3" style="color: #e91e63;">💖 Waifus</h4>
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4 mb-5">
+    {% for w in waifus %}
+    <div class="col">
+        <div class="card border-0 shadow-sm h-100">
+            <a href="{{ url_for('detail', anime_id=w[5]) }}">
+                <img src="{{ w[2] if w[2].startswith('http') else url_for('static', filename=w[2]) }}"
+                     class="card-img-top rounded-top" alt="Waifu Image"
+                     style="height: 300px; object-fit: cover; object-position: top;">
+            </a>
+            <div class="card-body text-center">
+                <h6 class="card-title mb-2">{{ w[1] }}</h6>
+                <p class="card-text small fst-italic text-muted">{{ w[3][:80] }}{% if w[3]|length > 80 %}...{% endif %}</p>
+                <form method="POST" action="{{ url_for('toggle_star', character_type='waifu', char_id=w[0]) }}">
+                    <button class="btn btn-sm btn-outline-warning">{{ '⭐' if w[4] else '☆' }}</button>
+                </form>
+                <div class="mt-2 small text-muted">From: <strong>{{ w[6] }}</strong></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Husbandos -->
+{% if husbandos %}
+<h4 class="mb-3 text-danger">❤️ Husbandos</h4>
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+    {% for h in husbandos %}
+    <div class="col">
+        <div class="card border-0 shadow-sm h-100">
+            <a href="{{ url_for('detail', anime_id=h[5]) }}">
+                <img src="{{ h[2] if h[2].startswith('http') else url_for('static', filename=h[2]) }}"
+                     class="card-img-top rounded-top" alt="Husbando Image"
+                     style="height: 300px; object-fit: cover; object-position: top;">
+            </a>
+            <div class="card-body text-center">
+                <h6 class="card-title mb-2">{{ h[1] }}</h6>
+                <p class="card-text small fst-italic text-muted">{{ h[3][:80] }}{% if h[3]|length > 80 %}...{% endif %}</p>
+                <form method="POST" action="{{ url_for('toggle_star', character_type='husbando', char_id=h[0]) }}">
+                    <button class="btn btn-sm btn-outline-warning">{{ '⭐' if h[4] else '☆' }}</button>
+                </form>
+                <div class="mt-2 small text-muted">From: <strong>{{ h[6] }}</strong></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if not waifus and not husbandos %}
+    <p class="text-muted text-center mt-5">No characters found.</p>
+{% endif %}
+
+{% endblock %}
