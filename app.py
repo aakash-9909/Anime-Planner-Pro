@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from werkzeug.utils import secure_filename
-from cs50 import SQl
+from cs50 import SQL
 # Configure application
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
