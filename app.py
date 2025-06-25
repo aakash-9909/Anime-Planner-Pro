@@ -60,7 +60,7 @@ def init_db():
                 rating_note TEXT,
                 favorite_episodes TEXT,
                 poster_url TEXT,
-                background_url TEXT
+                background_url ,
                 FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
             )
         """)
