@@ -8,6 +8,9 @@ import csv
 import io
 import json
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+
 # Configure application
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -16,6 +19,18 @@ app.secret_key = os.urandom(24)
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
+
+# managing login and stuff(login requires)
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            flash("Login required.")
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return wrapper
+
+
 
 # DB connection helper
 def get_db():
@@ -125,6 +140,7 @@ def index():
     return render_template("index.html")
 
 @app.route("/add", methods=["GET", "POST"])
+@login_required
 def add():
     if request.method == "POST":
         title = request.form.get("title")
@@ -154,10 +170,12 @@ def add():
             port="5432"
         )
         db = conn.cursor()
+        user_id = session.get("user_id")
+
         db.execute("""
-            INSERT INTO anime (title, rating, thoughts, date, sequel, details_url, background_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (title, rating, thoughts, date, sequel, details_url, background_url))
+            INSERT INTO anime (title, rating, thoughts, date, sequel, details_url, background_url, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (title, rating, thoughts, date, sequel, details_url, background_url, user_id))
 
         if sequel:
             db.execute("INSERT INTO sequel (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (sequel,))
@@ -176,6 +194,7 @@ def add():
         )
     db = conn.cursor()
     sort_by_rating = request.args.get("sort_by_rating")
+    user_id = session.get("user_id")
 
 
     conn = psycopg2.connect(
@@ -186,15 +205,15 @@ def add():
             port="5432"
         )
     db = conn.cursor()
-    db.execute("UPDATE anime SET rating = 0 WHERE rating IS NULL")
+    db.execute("UPDATE anime SET rating = 0 WHERE rating IS NULL AND user_id = %s", (user_id,))
     conn.commit()
 
 
 
     if sort_by_rating:
-        db.execute("SELECT title FROM anime WHERE rating IS NOT NULL ORDER BY rating DESC")
+        db.execute("SELECT title FROM anime WHERE rating IS NOT NULL AND user_id = %s ORDER BY rating DESC", (user_id,))
     else:
-        db.execute("SELECT DISTINCT title FROM anime ORDER BY title")
+        db.execute("SELECT DISTINCT title FROM anime WHERE user_id = %s ORDER BY title", (user_id,))
 
     sequel_list = [row[0] for row in db.fetchall()]
 
@@ -202,6 +221,7 @@ def add():
     return render_template("add.html", sequel_list=sequel_list, sort_active=bool(sort_by_rating))
 
 @app.route("/preview")
+@login_required
 def preview():
     sort_by_rating = request.args.get("sort_by_rating")
     conn = psycopg2.connect(
@@ -212,17 +232,19 @@ def preview():
             port="5432"
         )
     db = conn.cursor()
+    user_id = session.get("user_id")
+    
     if sort_by_rating:
-        db.execute("SELECT * FROM anime ORDER BY rating DESC")
+        db.execute("SELECT * FROM anime WHERE user_id = %s ORDER BY rating DESC", (user_id,))
         sort_active = True
     else:
-        db.execute("SELECT * FROM anime ORDER BY id DESC")
+        db.execute("SELECT * FROM anime WHERE user_id = %s ORDER BY id DESC", (user_id,))
         sort_active = False
 
     anime_list = db.fetchall()
 
-    # Get anime IDs that have details
-    db.execute("SELECT anime_id FROM anime_detail")
+    # Get anime IDs that have details (only for current user)
+    db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = %s", (user_id,))
     detail_ids = set(row[0] for row in db.fetchall())
 
     return render_template("preview.html", anime_list=anime_list, detail_ids=detail_ids, sort_active=sort_active)
@@ -230,6 +252,7 @@ def preview():
 
 
 @app.route("/edit/<int:anime_id>", methods=["GET", "POST"])
+@login_required
 def edit(anime_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
@@ -239,6 +262,8 @@ def edit(anime_id):
             port="5432"
         )
     db = conn.cursor()
+    user_id = session.get("user_id")
+    
     if request.method == "POST":
         title = request.form.get("title")
         rating = request.form.get("rating")
@@ -257,8 +282,8 @@ def edit(anime_id):
         db.execute("""
             UPDATE anime
             SET title = %s, rating = %s, thoughts = %s, date = %s, sequel = %s, details_url = %s, background_url = %s
-            WHERE id = %s
-        """, (title, rating, thoughts, date, sequel, details_url, background_url, anime_id))
+            WHERE id = %s AND user_id = %s
+        """, (title, rating, thoughts, date, sequel, details_url, background_url, anime_id, user_id))
 
         if sequel:
             db.execute("INSERT INTO sequel (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (sequel,))
@@ -267,14 +292,20 @@ def edit(anime_id):
         flash("Anime updated successfully!")
         return redirect("/preview")
 
-    db.execute("SELECT * FROM anime WHERE id = %s", (anime_id,))
+    db.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
     anime = db.fetchone()
-    db.execute("SELECT DISTINCT title FROM anime ORDER BY title")
+    
+    if not anime:
+        flash("Anime not found or access denied.")
+        return redirect("/preview")
+        
+    db.execute("SELECT DISTINCT title FROM anime WHERE user_id = %s ORDER BY title", (user_id,))
     sequel_list = [row[0] for row in db.fetchall()]
 
     return render_template("edit.html", anime=anime, sequel_list=sequel_list)
 
 @app.route("/delete/<int:anime_id>", methods=["POST"])
+@login_required
 def delete(anime_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
@@ -284,12 +315,14 @@ def delete(anime_id):
             port="5432"
         )
     db = conn.cursor()
-    db.execute("DELETE FROM anime WHERE id = %s", (anime_id,))
+    user_id = session.get("user_id")
+    db.execute("DELETE FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
     conn.commit()
     flash("Anime deleted successfully!")
     return redirect("/preview")
 
 @app.route("/list")
+@login_required
 def list_view():
     sort_by = request.args.get("sort", "rating")  # default: rating
     order = request.args.get("order", "desc")     # default: descending
@@ -304,11 +337,12 @@ def list_view():
         filter_null = "nonull"
 
     sort_column = "rating" if sort_by == "rating" else "date"
+    user_id = session.get("user_id")
 
     # Build SQL dynamically
-    base_query = f"SELECT id, title, rating, date FROM anime"
+    base_query = f"SELECT id, title, rating, date FROM anime WHERE user_id = %s"
     if filter_null == "nonull":
-        base_query += f" WHERE {sort_column} IS NOT NULL"
+        base_query += f" AND {sort_column} IS NOT NULL"
 
     base_query += f" ORDER BY {sort_column} {order.upper()}"
 
@@ -320,7 +354,7 @@ def list_view():
             port="5432"
         )
     db = conn.cursor()
-    db.execute(base_query)
+    db.execute(base_query, (user_id,))
     anime_list = db.fetchall()
 
     return render_template("list.html",
@@ -340,6 +374,7 @@ def render_stars(value):
     except:
         return "N/A"
 @app.route("/detail/<int:anime_id>")
+@login_required
 def detail(anime_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
@@ -349,13 +384,14 @@ def detail(anime_id):
             port="5432"
         )
     db = conn.cursor()
+    user_id = session.get("user_id")
 
-    # Fetch main anime data
-    db.execute("SELECT * FROM anime WHERE id = %s", (anime_id,))
+    # Fetch main anime data (only for current user)
+    db.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
     anime = db.fetchone()
 
     if not anime:
-        flash("Anime not found.")
+        flash("Anime not found or access denied.")
         return redirect("/preview")
 
     # Fetch detailed info
@@ -412,6 +448,7 @@ def detail(anime_id):
 
 
 @app.route("/edit_detail/<int:anime_id>", methods=["GET", "POST"])
+@login_required
 def edit_detail(anime_id):
     UPLOAD_FOLDER = "static/uploads"
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -425,11 +462,12 @@ def edit_detail(anime_id):
             port="5432"
         )
     db = conn.cursor()
+    user_id = session.get("user_id")
 
-    db.execute("SELECT * FROM anime WHERE id = %s", (anime_id,))
+    db.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
     anime = db.fetchone()
     if not anime:
-        flash("Anime not found.")
+        flash("Anime not found or access denied.")
         return redirect("/preview")
 
     if request.method == "POST":
@@ -652,6 +690,7 @@ def edit_detail(anime_id):
 
 
 @app.route("/list_detail")
+@login_required
 def list_detail():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
@@ -661,12 +700,14 @@ def list_detail():
             port="5432"
         )
     db = conn.cursor()
+    user_id = session.get("user_id")
     db.execute("""
         SELECT a.*, d.extra_notes, d.images, d.story_rating, d.visual_rating, d.sound_rating
         FROM anime a
         LEFT JOIN anime_detail d ON a.id = d.anime_id
+        WHERE a.user_id = %s
         ORDER BY a.id DESC
-    """)
+    """, (user_id,))
     anime_list = db.fetchall()
     return render_template("list_detail.html", anime_list=anime_list)
 
@@ -678,9 +719,11 @@ def json_loads_filter(s):
         return []
 
 @app.route("/characters", methods=["GET", "POST"])
+@login_required
 def characters():
     search = request.args.get("search", "").strip()
     query = "%" + search + "%" if search else "%"
+    user_id = session.get("user_id")
 
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
@@ -691,34 +734,36 @@ def characters():
         )
     db = conn.cursor()
 
-    # Fetch waifus
+    # Fetch waifus (only from user's anime)
     db.execute("""
         SELECT w.id, w.name, w.image, w.note, w.starred, a.id, a.title
         FROM anime_waifus w
         JOIN anime a ON w.anime_id = a.id
-        WHERE w.name LIKE %s
+        WHERE w.name LIKE %s AND a.user_id = %s
         ORDER BY w.starred DESC, w.name
-    """, (query,))
+    """, (query, user_id))
     waifus = db.fetchall()
 
-    # Fetch husbandos
+    # Fetch husbandos (only from user's anime)
     db.execute("""
         SELECT h.id, h.name, h.image, h.note, h.starred, a.id, a.title
         FROM anime_husbandos h
         JOIN anime a ON h.anime_id = a.id
-        WHERE h.name LIKE %s
+        WHERE h.name LIKE %s AND a.user_id = %s
         ORDER BY h.starred DESC, h.name
-    """, (query,))
+    """, (query, user_id))
     husbandos = db.fetchall()
 
     return render_template("characters.html", waifus=waifus, husbandos=husbandos, search=search)
 
 @app.route("/toggle_star/<string:character_type>/<int:char_id>", methods=["POST"])
+@login_required
 def toggle_star(character_type, char_id):
     if character_type not in ("waifu", "husbando"):
         return "Invalid type", 400
 
     table = "anime_waifus" if character_type == "waifu" else "anime_husbandos"
+    user_id = session.get("user_id")
 
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
@@ -728,12 +773,19 @@ def toggle_star(character_type, char_id):
             port="5432"
         )
     db = conn.cursor()
-    db.execute(f"UPDATE {table} SET starred = NOT starred WHERE id = %s", (char_id,))
+    
+    # Only allow toggling stars for characters from user's anime
+    db.execute(f"""
+        UPDATE {table} 
+        SET starred = NOT starred 
+        WHERE id = %s AND anime_id IN (SELECT id FROM anime WHERE user_id = %s)
+    """, (char_id, user_id))
     conn.commit()
 
     return redirect(request.referrer or url_for("characters"))
 
 @app.route("/export")
+@login_required
 def export():
     # Create string buffer
     output = io.StringIO()
@@ -742,7 +794,7 @@ def export():
     # Write header
     writer.writerow(["id", "title", "rating", "thoughts", "date", "sequel", "details_url", "background_url"])
 
-    # Get data and write rows
+    # Get data and write rows (only for current user)
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
@@ -751,7 +803,8 @@ def export():
             port="5432"
         )
     db = conn.cursor()
-    db.execute("SELECT * FROM anime ORDER BY id DESC")
+    user_id = session.get("user_id")
+    db.execute("SELECT * FROM anime WHERE user_id = %s ORDER BY id DESC", (user_id,))
     rows = db.fetchall()
 
     for row in rows:
@@ -768,6 +821,61 @@ def export():
         mimetype='text/csv',
         headers={"Content-Disposition": "attachment; filename=anime_list.csv"}
     )
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        confirmation = request.form.get("confirmation")
+
+        if not username or not password or password != confirmation:
+            flash("Invalid input or passwords do not match.")
+            return redirect("/register")
+
+        hashed = generate_password_hash(password)
+
+        try:
+            with get_db() as conn:
+                with conn.cursor() as db:
+                    db.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, hashed))
+                    conn.commit()
+            flash("Registered successfully!")
+            return redirect("/login")
+        except:
+            flash("Username already exists.")
+            return redirect("/register")
+
+    return render_template("register.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        with get_db() as conn:
+            with conn.cursor() as db:
+                db.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
+                user = db.fetchone()
+
+        if user and check_password_hash(user[1], password):
+            session["user_id"] = user[0]
+            flash("Logged in successfully!")
+            return redirect("/")
+        else:
+            flash("Invalid username or password.")
+            return redirect("/login")
+
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Logged out successfully.")
+    return redirect("/")
+
+
 
 if __name__ == "__main__":
     init_db()
