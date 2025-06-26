@@ -210,14 +210,12 @@ def add():
             background_file.save(save_path)
             background_url = f"uploads/{filename}"
 
-        db.execute(
-            """
+        db.execute("""
             INSERT INTO anime (title, rating, thoughts, date, sequel, details_url, background_url, user_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (title, rating, thoughts, date, sequel, details_url, background_url, user_id)
-        )
-        anime_id = db.lastrowid
+            RETURNING id
+        """, (title, rating, thoughts, date, sequel, details_url, background_url, user_id))
+        anime_id = db.fetchone()[0]
 
         # Now, create the corresponding anime_detail entry
         db.execute(
