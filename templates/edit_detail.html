@@ -30,15 +30,19 @@
         <!-- Background Image URL -->
         <div class="mb-3">
             <label for="background_url" class="form-label">Background Image URL (optional)</label>
-            <input type="url" class="form-control" name="background_url" id="background_url"
+            <input type="text" class="form-control mb-1" name="background_url" id="background_url"
                 value="{{ detail[11] if detail and detail|length > 11 else '' }}">
+            <input type="file" class="form-control" name="background_upload" accept="image/*">
+            <div class="form-text">You can upload a background image from your computer.</div>
         </div>
 
         <!-- Poster URL -->
         <div class="mb-3">
             <label for="poster_url" class="form-label">Anime Poster URL (optional)</label>
-            <input type="url" class="form-control" name="poster_url" id="poster_url"
+            <input type="text" class="form-control mb-1" name="poster_url" id="poster_url"
                    value="{{ detail[10] if detail and detail|length > 10 else '' }}">
+            <input type="file" class="form-control" name="poster_upload" accept="image/*">
+            <div class="form-text">You can upload a poster image from your computer.</div>
         </div>
 
         <!-- Image URLs -->
@@ -50,10 +54,9 @@
 
         <!-- Image Upload -->
         <div class="mb-3">
-            <label for="image_uploads" class="form-label">Upload Fake Images</label>
+            <label for="image_uploads" class="form-label">Upload Images</label>
             <input type="file" class="form-control" name="image_uploads" id="image_uploads" accept="image/*" multiple>
             <div class="form-text">You can upload multiple image files from your computer.</div>
-            <div class="form-text">That was a lie i have spent enough hours to fix this, this doesn't work god knows why...</div>
         </div>
 
         <!-- Sub Ratings -->
@@ -104,6 +107,7 @@
                 <label>Episode Image URLs (comma separated)</label>
                 <input type="text" name="episode_images_{{ ep.id }}" class="form-control"
                     value="{{ ep.images | join(', ') }}">
+                <input type="file" name="episode_image_upload_{{ ep.id }}" class="form-control mt-1" accept="image/*" multiple>
             </div>
 
             <div class="row">
@@ -155,6 +159,7 @@
                 <div class="mb-2">
                     <label>Episode Image URLs (comma separated)</label>
                     <input type="text" name="episode_images" class="form-control">
+                    <input type="file" name="episode_image_upload" class="form-control mt-1" accept="image/*" multiple>
                 </div>
                 <div class="row">
                     <div class="col-md-4">
@@ -190,7 +195,8 @@
             </div>
             <div class="mb-2">
                 <label>Photo URL</label>
-                <input type="url" name="waifu_image_{{ w.id }}" class="form-control" value="{{ w.image }}">
+                <input type="text" name="waifu_image_{{ w.id }}" class="form-control mb-1" value="{{ w.image }}">
+                <input type="file" name="waifu_image_upload_{{ w.id }}" class="form-control" accept="image/*">
             </div>
             <div class="mb-2">
                 <label>Note</label>
@@ -219,7 +225,8 @@
             </div>
             <div class="mb-2">
                 <label>Photo URL</label>
-                <input type="url" name="husbando_image_{{ h.id }}" class="form-control" value="{{ h.image }}">
+                <input type="text" name="husbando_image_{{ h.id }}" class="form-control mb-1" value="{{ h.image }}">
+                <input type="file" name="husbando_image_upload_{{ h.id }}" class="form-control" accept="image/*">
             </div>
             <div class="mb-2">
                 <label>Note</label>
@@ -250,7 +257,8 @@
                     </div>
                     <div class="mb-2">
                         <label>Photo URL</label>
-                        <input type="url" name="husbando_image" class="form-control">
+                        <input type="text" name="husbando_image" class="form-control mb-1">
+                        <input type="file" name="husbando_image_upload" class="form-control" accept="image/*">
                     </div>
                     <div class="mb-2">
                         <label>Note</label>
@@ -273,7 +281,8 @@
                     </div>
                     <div class="mb-2">
                         <label>Photo URL</label>
-                        <input type="url" name="waifu_image" class="form-control">
+                        <input type="text" name="waifu_image" class="form-control mb-1">
+                        <input type="file" name="waifu_image_upload" class="form-control" accept="image/*">
                     </div>
                     <div class="mb-2">
                         <label>Note</label>

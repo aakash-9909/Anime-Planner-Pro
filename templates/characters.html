@@ -13,6 +13,12 @@
     </div>
 </form>
 
+<!-- Crop Toggle -->
+<div class="mb-4 text-end">
+    <label class="form-check-label me-2" for="cropToggle">Crop:</label>
+    <input type="checkbox" class="form-check-input" id="cropToggle" checked>
+</div>
+
 <!-- Waifus -->
 {% if waifus %}
 <h4 class="mb-3" style="color: #e91e63;">💖 Waifus</h4>
@@ -23,7 +29,7 @@
             <a href="{{ url_for('detail', anime_id=w[5]) }}">
                 <img src="{{ w[2] if w[2].startswith('http') else url_for('static', filename=w[2]) }}"
                      class="card-img-top rounded-top" alt="Waifu Image"
-                     style="height: 300px; object-fit: cover; object-position: top;">
+                     style="height: 300px; object-fit: contain; background: #f8f9fa;">
             </a>
             <div class="card-body text-center">
                 <h6 class="card-title mb-2">{{ w[1] }}</h6>
@@ -49,7 +55,7 @@
             <a href="{{ url_for('detail', anime_id=h[5]) }}">
                 <img src="{{ h[2] if h[2].startswith('http') else url_for('static', filename=h[2]) }}"
                      class="card-img-top rounded-top" alt="Husbando Image"
-                     style="height: 300px; object-fit: cover; object-position: top;">
+                     style="height: 300px; object-fit: contain; background: #f8f9fa;">
             </a>
             <div class="card-body text-center">
                 <h6 class="card-title mb-2">{{ h[1] }}</h6>
@@ -69,4 +75,27 @@
     <p class="text-muted text-center mt-5">No characters found.</p>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Toggle crop/contain for character images
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggle = document.getElementById('cropToggle');
+        function updateCrop() {
+            const imgs = document.querySelectorAll('.card-img-top');
+            imgs.forEach(img => {
+                if (toggle.checked) {
+                    img.style.objectFit = 'cover';
+                    img.style.objectPosition = 'top';
+                } else {
+                    img.style.objectFit = 'contain';
+                    img.style.objectPosition = 'center';
+                }
+            });
+        }
+        toggle.addEventListener('change', updateCrop);
+        updateCrop();
+    });
+</script>
 {% endblock %}

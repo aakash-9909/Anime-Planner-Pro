@@ -4,24 +4,24 @@
 
 {% block main %}
 <h2 class="mb-4">Edit Anime Entry</h2>
-<form method="post" action="/edit/{{ anime[0] }}" class="text-start mx-auto" style="max-width: 600px;">
+<form method="post" action="/edit/{{ anime.id }}" class="text-start mx-auto" style="max-width: 600px;" enctype="multipart/form-data">
     <div class="mb-3">
         <label for="title" class="form-label">Anime Title</label>
-        <input type="text" class="form-control" id="title" name="title" value="{{ anime[1] }}" required>
+        <input type="text" class="form-control" id="title" name="title" value="{{ anime.title }}" required>
     </div>
     <div class="mb-3">
         <label for="rating" class="form-label">Your Rating (1–10)</label>
-        <input type="number" class="form-control" id="rating" name="rating" step="0.001" min="1" max="12" value="{{ anime[2] }}">
+        <input type="number" class="form-control" id="rating" name="rating" step="0.001" min="1" max="12" value="{{ anime.rating }}">
     </div>
     <div class="mb-3">
         <label for="thoughts" class="form-label">Short Thoughts</label>
-        <textarea class="form-control" id="thoughts" name="thoughts" rows="2">{{ anime[3] }}</textarea>
+        <textarea class="form-control" id="thoughts" name="thoughts" rows="2">{{ anime.thoughts }}</textarea>
     </div>
     <div class="mb-3">
         <label for="date" class="form-label">Date Watched</label>
-        <input type="date" class="form-control" id="date" name="date" value="{{ anime[4] }}">
+        <input type="date" class="form-control" id="date" name="date" value="{{ anime.date }}">
         <div class="form-check mt-2">
-            <input class="form-check-input" type="checkbox" value="1" id="no_date" name="no_date" {% if not anime[4] %}checked{% endif %}>
+            <input class="form-check-input" type="checkbox" value="1" id="no_date" name="no_date" {% if not anime.date %}checked{% endif %}>
             <label class="form-check-label" for="no_date">No date</label>
         </div>
     </div>
@@ -30,17 +30,15 @@
         <select class="form-select" id="sequel" name="sequel">
             <option value="">-- None --</option>
             {% for name in sequel_list %}
-                <option value="{{ name }}" {% if anime[5] == name %}selected{% endif %}>{{ name }}</option>
+                <option value="{{ name }}" {% if anime.sequel == name %}selected{% endif %}>{{ name }}</option>
             {% endfor %}
         </select>
     </div>
     <div class="mb-3">
         <label for="background_url" class="form-label">Background Image URL (optional)</label>
-        <input type="url" class="form-control" id="background_url" name="background_url" value="{{ anime[7] }}">
-    </div>
-    <div class="mb-3">
-        <label for="details_url" class="form-label">More Details URL (optional)</label>
-        <input type="url" class="form-control" id="details_url" name="details_url" value="{{ anime[6] }}">
+        <input type="url" class="form-control" id="background_url" name="background_url" value="{{ anime.background_url }}">
+        <input type="file" class="form-control mt-2" id="background_upload" name="background_upload" accept="image/*">
+        <div class="form-text">You can upload a new background image from your computer to replace the existing one.</div>
     </div>
     <div class="d-grid">
         <button type="submit" class="btn btn-success">Update Anime</button>

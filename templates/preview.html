@@ -24,57 +24,59 @@
 
 <div class="container-fluid px-0" id="animeList">
     {% for anime in anime_list %}
-    <div class="mb-4 anime-card" id="anime-{{ anime[0] }}">
+    <div class="mb-4 anime-card" id="anime-{{ anime.id }}">
         <div class="card text-white shadow-lg position-relative overflow-hidden border-0 mx-auto"
              style="
                  border-radius: 1.5rem;
                  min-height: 400px;
                  background-size: cover;
                  background-position: center;
-                 background-image: url('{{ anime[7] if anime[7] else url_for('static', filename='default.jpg') }}');
+                 background-image: url('{{ (anime.background_url if anime.background_url.startswith('http') else url_for('static', filename=anime.background_url)) if anime.background_url else url_for('static', filename='default.jpg') }}');
                  max-width: 1200px;
                  width: 100%;
-
-
              ">
-            <!-- Edit & Delete Controls -->
-            <div class="position-absolute top-0 end-0 p-2 d-flex gap-1 edit-controls">
-                <form method="post" action="{{ url_for('delete', anime_id=anime[0]) }}" onsubmit="return confirm('Delete this anime?');">
-                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
-                </form>
-                <a href="{{ url_for('edit', anime_id=anime[0]) }}" class="btn btn-sm btn-light"><i class="bi bi-pencil"></i></a>
-            </div>
-
             <!-- Date Badge -->
-            {% if anime[4] %}
-            <div class="position-absolute top-0 start-0 p-2">
-                <span class="badge bg-dark" title="{{ anime[4] }}">{{ anime[4]|datetimeformat('%b %Y') }}</span>
+            {% if anime.date %}
+            <div class="position-absolute top-0 start-0 p-2" style="z-index:2;">
+                <span class="badge bg-dark" title="{{ anime.date }}">{{ anime.date|datetimeformat('%b %Y') }}</span>
             </div>
             {% endif %}
 
-            <!-- Content -->
-            <div class="card-body bg-dark bg-opacity-75 text-white rounded-4 m-3">
-                <h4 class="card-title">{{ anime[1] }}</h4>
-                <p class="card-text mb-1">⭐ <strong>{{ anime[2] }}/10</strong></p>
-                {% if anime[3] %}
-                    <p class="card-text"><strong>Thoughts:</strong> {{ anime[3] }}</p>
-                {% endif %}
-                {% if anime[5] %}
-                    <p class="card-text"><strong>Sequel of:</strong> {{ anime[5] }}</p>
-                {% endif %}
-                {% if anime[6] %}
-                    <p class="card-text"><a class="text-info" href="{{ anime[6] }}" target="_blank">More Details</a></p>
-                {% endif %}
-                {% if anime[0] in detail_ids %}
-                    <!-- <p class="card-text"><a class="text-warning" href="{{ url_for('detail', anime_id=anime[0]) }}">📘 View Details</a></p> -->
-                {% endif %}
+            <!-- Edit & Delete Controls -->
+            <div class="position-absolute top-0 end-0 p-2 d-flex gap-1 edit-controls" style="z-index:2;">
+                <form method="post" action="{{ url_for('delete', anime_id=anime.id) }}" onsubmit="return confirm('Delete this anime?');">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                </form>
+                <a href="{{ url_for('edit', anime_id=anime.id) }}" class="btn btn-sm btn-light"><i class="bi bi-pencil"></i></a>
+            </div>
 
-                <!-- Detail Controls -->
-                <div class="position-absolute bottom-0 end-0 m-2 d-flex gap-2 detail-controls">
-                    {% if anime[0] in detail_ids %}
-                        <a href="{{ url_for('detail', anime_id=anime[0]) }}" class="btn btn-sm btn-light" title="View Details">🔍</a>
+            <!-- Content -->
+            <div class="card-body bg-dark bg-opacity-75 text-white rounded-4 m-3 position-relative" style="min-height: 220px;">
+                <div class="row g-0 align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="card-title">{{ anime.title }}</h4>
+                        <p class="card-text mb-1">⭐ <strong>{{ anime.rating }}/10</strong></p>
+                        {% if anime.thoughts %}
+                            <p class="card-text"><strong>Thoughts:</strong> {{ anime.thoughts }}</p>
+                        {% endif %}
+                        {% if anime.sequel %}
+                            <p class="card-text"><strong>Sequel of:</strong> {{ anime.sequel }}</p>
+                        {% endif %}
+                        {% if anime.details_url and anime.details_url is string and anime.details_url|length > 0 and anime.details_url.startswith('http') %}
+                            <p class="card-text"><a class="text-info" href="{{ anime.details_url }}" target="_blank">More Details</a></p>
+                        {% endif %}
+                    </div>
+                    {% if anime.poster_url %}
+                    <div class="col-md-4 d-flex justify-content-end align-items-center">
+                        <img src="{{ anime.poster_url if anime.poster_url.startswith('http') else url_for('static', filename=anime.poster_url) }}" class="img-fluid rounded shadow" alt="Anime Poster" style="max-width: 220px; max-height: 320px;">
+                    </div>
                     {% endif %}
-                    <a href="{{ url_for('edit_detail', anime_id=anime[0]) }}" class="btn btn-sm btn-success" title="Add/Edit Details">➕</a>
+                </div>
+                <div class="position-absolute bottom-0 end-0 m-2 d-flex gap-2 detail-controls">
+                    {% if anime.id in detail_ids %}
+                        <a href="{{ url_for('detail', anime_id=anime.id) }}" class="btn btn-sm btn-light" title="View Details">🔍</a>
+                    {% endif %}
+                    <a href="{{ url_for('edit_detail', anime_id=anime.id) }}" class="btn btn-sm btn-success" title="Add/Edit Details">➕</a>
                 </div>
             </div>
         </div>

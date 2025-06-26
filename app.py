@@ -10,10 +10,16 @@ import json
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import random
 
 # Configure application
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+
+# Configure upload folder
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Configure session to use filesystem
 app.config["SESSION_PERMANENT"] = False
@@ -30,9 +36,8 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-
-
 # DB connection helper
+# Restore original get_db()
 def get_db():
     return psycopg2.connect(
         dbname="anime_db_7a6a",
@@ -56,14 +61,14 @@ def init_db():
         with conn.cursor() as db:
             db.execute("""
                 CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL
                 )
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime (
-                    id SERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT NOT NULL,
                     rating REAL,
                     thoughts TEXT,
@@ -77,13 +82,13 @@ def init_db():
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS sequel (
-                    id SERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT UNIQUE NOT NULL
                 )
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_detail (
-                    id SERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     anime_id INTEGER NOT NULL,
                     extra_notes TEXT,
                     images TEXT,
@@ -100,7 +105,7 @@ def init_db():
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_episodes (
-                    id SERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     anime_id INTEGER,
                     episode_number INTEGER,
                     episode_note TEXT,
@@ -113,23 +118,23 @@ def init_db():
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_husbandos (
-                    id SERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     anime_id INTEGER NOT NULL,
                     name TEXT,
                     image TEXT,
                     note TEXT,
-                    starred BOOLEAN DEFAULT FALSE,
+                    starred INTEGER DEFAULT 0,
                     FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
                 )
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_waifus (
-                    id SERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     anime_id INTEGER NOT NULL,
                     name TEXT,
                     image TEXT,
                     note TEXT,
-                    starred BOOLEAN DEFAULT FALSE,
+                    starred INTEGER DEFAULT 0,
                     FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
                 )
             """)
@@ -137,7 +142,27 @@ def init_db():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # Romcom/funny quotes (no explicit or Naruto quotes)
+    quotes = [
+        {"text": "I have no interest in ordinary humans. If there are any aliens, time travelers, or espers here, come join me.", "author": "Haruhi Suzumiya", "anime": "The Melancholy of Haruhi Suzumiya"},
+        {"text": "I am not a tsundere!", "author": "Taiga Aisaka", "anime": "Toradora!"},
+        {"text": "Love is like a hurricane!", "author": "Rikka Takanashi", "anime": "Chuunibyou demo Koi ga Shitai!"},
+        {"text": "I'm not short! I'm fun-sized!", "author": "Shinobu Oshino", "anime": "Monogatari Series"},
+        {"text": "I am... just a passing-through ordinary house husband.", "author": "Tatsu", "anime": "The Way of the Househusband"},
+        {"text": "I want to eat your pancreas!", "author": "Sakura Yamauchi", "anime": "I Want to Eat Your Pancreas"},
+        {"text": "My body is made of 100% sugar.", "author": "Chiyo Sakura", "anime": "Monthly Girls' Nozaki-kun"},
+        {"text": "I am the bone of my bread.", "author": "Kaguya Shinomiya", "anime": "Kaguya-sama: Love is War"},
+        {"text": "If you have time to fantasize about a beautiful end, then just live beautifully 'til the end.", "author": "Sakata Gintoki", "anime": "Gintama"}
+    ]
+    quote = random.choice(quotes)
+
+    # Random image gallery from uploads
+    uploads_dir = os.path.join(app.root_path, 'static', 'uploads')
+    all_images = [f for f in os.listdir(uploads_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))]
+    gallery_images = random.sample(all_images, min(6, len(all_images))) if all_images else []
+    gallery_images = [f"uploads/{img}" for img in gallery_images]
+
+    return render_template("index.html", quote=quote, gallery_images=gallery_images)
 
 @app.route("/add", methods=["GET", "POST"])
 @login_required
@@ -149,7 +174,6 @@ def add():
         thoughts = request.form.get("thoughts")
         date = request.form.get("date")
         sequel = request.form.get("sequel")
-        details_url = request.form.get("details_url")
         background_url = request.form.get("background_url")
         no_date = request.form.get("no_date")
 
@@ -162,53 +186,64 @@ def add():
         elif not date:
             date = datetime.today().strftime('%Y-%m-%d')
 
-        conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+        conn = get_db()
         db = conn.cursor()
         user_id = session.get("user_id")
 
-        db.execute("""
+        poster_file = request.files.get("poster_upload") if "poster_upload" in request.files else None
+        poster_url = None
+        details_url = None  # Always define details_url
+        if poster_file and poster_file.filename:
+            filename = secure_filename(poster_file.filename)
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            poster_file.save(save_path)
+            poster_url = f"uploads/{filename}"
+            details_url = poster_url
+        # If not uploaded, check for details_url in form (optional)
+        if not details_url:
+            details_url = request.form.get("details_url") or None
+
+        background_file = request.files.get("background_upload") if "background_upload" in request.files else None
+        if background_file and background_file.filename:
+            filename = secure_filename(background_file.filename)
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            background_file.save(save_path)
+            background_url = f"uploads/{filename}"
+
+        db.execute(
+            """
             INSERT INTO anime (title, rating, thoughts, date, sequel, details_url, background_url, user_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (title, rating, thoughts, date, sequel, details_url, background_url, user_id))
+            """,
+            (title, rating, thoughts, date, sequel, details_url, background_url, user_id)
+        )
+        anime_id = db.lastrowid
+
+        # Now, create the corresponding anime_detail entry
+        db.execute(
+            """
+            INSERT INTO anime_detail (anime_id, poster_url, background_url)
+            VALUES (%s, %s, %s)
+            """,
+            (anime_id, poster_url, background_url)
+        )
 
         if sequel:
-            db.execute("INSERT INTO sequel (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (sequel,))
-
+            db.execute("INSERT INTO sequel (name) VALUES (%s)", (sequel,))
 
         conn.commit()
 
         flash("Anime added successfully!")
         return redirect("/preview")
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     sort_by_rating = request.args.get("sort_by_rating")
     user_id = session.get("user_id")
 
-
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     db.execute("UPDATE anime SET rating = 0 WHERE rating IS NULL AND user_id = %s", (user_id,))
     conn.commit()
-
-
 
     if sort_by_rating:
         db.execute("SELECT title FROM anime WHERE rating IS NOT NULL AND user_id = %s ORDER BY rating DESC", (user_id,))
@@ -217,50 +252,37 @@ def add():
 
     sequel_list = [row[0] for row in db.fetchall()]
 
-
     return render_template("add.html", sequel_list=sequel_list, sort_active=bool(sort_by_rating))
 
 @app.route("/preview")
 @login_required
 def preview():
     sort_by_rating = request.args.get("sort_by_rating")
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
-    db = conn.cursor()
+    conn = get_db()
+    db = conn.cursor(cursor_factory=RealDictCursor)
     user_id = session.get("user_id")
     
-    if sort_by_rating:
-        db.execute("SELECT * FROM anime WHERE user_id = %s ORDER BY rating DESC", (user_id,))
-        sort_active = True
-    else:
-        db.execute("SELECT * FROM anime WHERE user_id = %s ORDER BY id DESC", (user_id,))
-        sort_active = False
-
+    order_clause = "ORDER BY a.rating DESC" if sort_by_rating else "ORDER BY a.id DESC"
+    
+    db.execute(f"""
+        SELECT a.*, d.poster_url
+        FROM anime a
+        LEFT JOIN anime_detail d ON a.id = d.anime_id
+        WHERE a.user_id = %s
+        {order_clause}
+    """, (user_id,))
     anime_list = db.fetchall()
 
-    # Get anime IDs that have details (only for current user)
+    # Get anime IDs that have details
     db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = %s", (user_id,))
-    detail_ids = set(row[0] for row in db.fetchall())
+    detail_ids = set(row['anime_id'] for row in db.fetchall())
 
-    return render_template("preview.html", anime_list=anime_list, detail_ids=detail_ids, sort_active=sort_active)
-
-
+    return render_template("preview.html", anime_list=anime_list, detail_ids=detail_ids, sort_active=bool(sort_by_rating))
 
 @app.route("/edit/<int:anime_id>", methods=["GET", "POST"])
 @login_required
 def edit(anime_id):
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     user_id = session.get("user_id")
     
@@ -270,7 +292,6 @@ def edit(anime_id):
         thoughts = request.form.get("thoughts")
         date = request.form.get("date")
         sequel = request.form.get("sequel")
-        details_url = request.form.get("details_url")
         background_url = request.form.get("background_url")
         no_date = request.form.get("no_date")
 
@@ -279,21 +300,24 @@ def edit(anime_id):
         elif not date:
             date = datetime.today().strftime('%Y-%m-%d')
 
+        # Update main anime table (without details_url)
         db.execute("""
             UPDATE anime
-            SET title = %s, rating = %s, thoughts = %s, date = %s, sequel = %s, details_url = %s, background_url = %s
+            SET title = %s, rating = %s, thoughts = %s, date = %s, sequel = %s, background_url = %s
             WHERE id = %s AND user_id = %s
-        """, (title, rating, thoughts, date, sequel, details_url, background_url, anime_id, user_id))
+        """, (title, rating, thoughts, date, sequel, background_url, anime_id, user_id))
 
         if sequel:
-            db.execute("INSERT INTO sequel (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (sequel,))
+            db.execute("INSERT INTO sequel (name) VALUES (%s)", (sequel,))
 
         conn.commit()
         flash("Anime updated successfully!")
         return redirect("/preview")
 
-    db.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
-    anime = db.fetchone()
+    # Use RealDictCursor for GET to make template access consistent
+    db_dict = get_db()
+    db_dict.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
+    anime = db_dict.fetchone()
     
     if not anime:
         flash("Anime not found or access denied.")
@@ -307,13 +331,7 @@ def edit(anime_id):
 @app.route("/delete/<int:anime_id>", methods=["POST"])
 @login_required
 def delete(anime_id):
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     user_id = session.get("user_id")
     db.execute("DELETE FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
@@ -340,19 +358,13 @@ def list_view():
     user_id = session.get("user_id")
 
     # Build SQL dynamically
-    base_query = f"SELECT id, title, rating, date FROM anime WHERE user_id = %s"
+    base_query = "SELECT id, title, rating, date FROM anime WHERE user_id = %s"
     if filter_null == "nonull":
         base_query += f" AND {sort_column} IS NOT NULL"
 
     base_query += f" ORDER BY {sort_column} {order.upper()}"
 
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     db.execute(base_query, (user_id,))
     anime_list = db.fetchall()
@@ -376,13 +388,7 @@ def render_stars(value):
 @app.route("/detail/<int:anime_id>")
 @login_required
 def detail(anime_id):
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     user_id = session.get("user_id")
 
@@ -403,7 +409,9 @@ def detail(anime_id):
     if detail and detail[3]:
         try:
             image_urls = json.loads(detail[3])
-        except:
+            print(f"Debug: Loaded {len(image_urls)} images from database: {image_urls}")
+        except Exception as e:
+            print(f"Debug: Error parsing images JSON: {e}")
             image_urls = []
 
     # Fetch and format episodes
@@ -446,21 +454,10 @@ def detail(anime_id):
     husbandos=husbandos
 )
 
-
 @app.route("/edit_detail/<int:anime_id>", methods=["GET", "POST"])
 @login_required
 def edit_detail(anime_id):
-    UPLOAD_FOLDER = "static/uploads"
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     user_id = session.get("user_id")
 
@@ -483,43 +480,79 @@ def edit_detail(anime_id):
         rating_note = request.form.get("rating_note")
         images_raw = request.form.get("images", "")
 
+        # Convert empty strings to None for numeric fields
+        story_rating = float(story_rating) if story_rating and story_rating.strip() else None
+        visual_rating = float(visual_rating) if visual_rating and visual_rating.strip() else None
+        sound_rating = float(sound_rating) if sound_rating and sound_rating.strip() else None
+
         # === Handle images ===
         image_urls = [url.strip() for url in images_raw.split(",") if url.strip()]
         uploaded_files = request.files.getlist("image_uploads")
         uploaded_paths = []
+        
+        print(f"Debug: Found {len(uploaded_files)} uploaded files")
+        
         for file in uploaded_files:
             if file and file.filename:
-                filename = secure_filename(file.filename)
-                save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                file.save(save_path)
-                uploaded_paths.append(f"uploads/{filename}")
+                try:
+                    filename = secure_filename(file.filename)
+                    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    print(f"Debug: Saving file {filename} to {save_path}")
+                    file.save(save_path)
+                    uploaded_paths.append(f"uploads/{filename}")
+                    print(f"Debug: Successfully saved {filename}")
+                except Exception as e:
+                    print(f"Debug: Error saving file {file.filename}: {e}")
+                    flash(f"Error uploading {file.filename}: {str(e)}")
+        
         all_images = image_urls + uploaded_paths
         image_json = json.dumps(all_images)
+        print(f"Debug: Final image list: {all_images}")
 
-        # === Update or insert anime_detail ===
-        db.execute("SELECT id FROM anime_detail WHERE anime_id = %s", (anime_id,))
-        exists = db.fetchone()
-        if exists:
-            db.execute("""
-                UPDATE anime_detail
-                SET extra_notes = %s, lessons = %s, favorite_episodes = %s, poster_url = %s, background_url = %s,
-                    images = %s, story_rating = %s, visual_rating = %s, sound_rating = %s, rating_note = %s
-                WHERE anime_id = %s
-            """, (
-                extra_notes, lessons, favorite_episodes, poster_url, background_url,
-                image_json, story_rating, visual_rating, sound_rating, rating_note,
-                anime_id
-            ))
-        else:
-            db.execute("""
-                INSERT INTO anime_detail (
+        # === Handle poster and background uploads ===
+        poster_file = request.files.get("poster_upload")
+        if poster_file and poster_file.filename:
+            filename = secure_filename(poster_file.filename)
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            poster_file.save(save_path)
+            poster_url = f"uploads/{filename}"
+
+        background_file = request.files.get("background_upload") if "background_upload" in request.files else None
+        if background_file and background_file.filename:
+            filename = secure_filename(background_file.filename)
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            background_file.save(save_path)
+            background_url = f"uploads/{filename}"
+
+        try:
+            # === Update or insert anime_detail ===
+            db.execute("SELECT id FROM anime_detail WHERE anime_id = %s", (anime_id,))
+            exists = db.fetchone()
+            if exists:
+                db.execute("""
+                    UPDATE anime_detail
+                    SET extra_notes = %s, lessons = %s, favorite_episodes = %s, poster_url = %s, background_url = %s,
+                        images = %s, story_rating = %s, visual_rating = %s, sound_rating = %s, rating_note = %s
+                    WHERE anime_id = %s
+                """, (
+                    extra_notes, lessons, favorite_episodes, poster_url, background_url,
+                    image_json, story_rating, visual_rating, sound_rating, rating_note,
+                    anime_id
+                ))
+            else:
+                db.execute("""
+                    INSERT INTO anime_detail (
+                        anime_id, extra_notes, lessons, favorite_episodes, poster_url, background_url,
+                        images, story_rating, visual_rating, sound_rating, rating_note
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
                     anime_id, extra_notes, lessons, favorite_episodes, poster_url, background_url,
-                    images, story_rating, visual_rating, sound_rating, rating_note
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                anime_id, extra_notes, lessons, favorite_episodes, poster_url, background_url,
-                image_json, story_rating, visual_rating, sound_rating, rating_note
-            ))
+                    image_json, story_rating, visual_rating, sound_rating, rating_note
+                ))
+        except Exception as e:
+            print(f"Debug: Database error: {e}")
+            flash(f"Database error: {str(e)}")
+            return redirect(url_for("edit_detail", anime_id=anime_id))
 
         # === Update or delete existing episodes ===
         existing_ids = request.form.getlist("existing_episode_ids")
@@ -531,10 +564,19 @@ def edit_detail(anime_id):
                 ep_num = request.form.get(f"episode_number_{eid}")
                 ep_note = request.form.get(f"episode_note_{eid}")
                 ep_images_raw = request.form.get(f"episode_images_{eid}")
-                ep_images = json.dumps([url.strip() for url in ep_images_raw.split(",") if url.strip()])
-                ep_overall = request.form.get(f"episode_overall_{eid}") or 0
-                ep_animation = request.form.get(f"episode_animation_{eid}") or 0
-                ep_story = request.form.get(f"episode_story_{eid}") or 0
+                ep_images_list = [url.strip() for url in ep_images_raw.split(",") if url.strip()]
+                # Handle episode image upload
+                ep_files = request.files.getlist(f"episode_image_upload_{eid}")
+                for file in ep_files:
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                        file.save(save_path)
+                        ep_images_list.append(f"uploads/{filename}")
+                ep_images = json.dumps(ep_images_list)
+                ep_overall = float(request.form.get(f"episode_overall_{eid}")) if request.form.get(f"episode_overall_{eid}") and request.form.get(f"episode_overall_{eid}").strip() else None
+                ep_animation = float(request.form.get(f"episode_animation_{eid}")) if request.form.get(f"episode_animation_{eid}") and request.form.get(f"episode_animation_{eid}").strip() else None
+                ep_story = float(request.form.get(f"episode_story_{eid}")) if request.form.get(f"episode_story_{eid}") and request.form.get(f"episode_story_{eid}").strip() else None
 
                 db.execute("""
                     UPDATE anime_episodes
@@ -550,15 +592,29 @@ def edit_detail(anime_id):
         new_episode_overalls = request.form.getlist("episode_overall")
         new_episode_animations = request.form.getlist("episode_animation")
         new_episode_stories = request.form.getlist("episode_story")
-
+        # For new episodes, handle multiple files per episode
+        new_episode_files = request.files.getlist("episode_image_upload")
+        file_idx = 0
         for i in range(len(new_episode_numbers)):
             try:
                 ep_num = int(new_episode_numbers[i])
                 ep_note = new_episode_notes[i]
-                ep_images = json.dumps([url.strip() for url in new_episode_images[i].split(",") if url.strip()])
-                ep_overall = float(new_episode_overalls[i]) if new_episode_overalls[i] else 0
-                ep_animation = float(new_episode_animations[i]) if new_episode_animations[i] else 0
-                ep_story = float(new_episode_stories[i]) if new_episode_stories[i] else 0
+                ep_images_list = [url.strip() for url in new_episode_images[i].split(",") if url.strip()]
+                # Handle episode image upload for new episodes
+                # Try to match files to episodes by order
+                episode_files = []
+                while file_idx < len(new_episode_files) and new_episode_files[file_idx] and new_episode_files[file_idx].filename:
+                    filename = secure_filename(new_episode_files[file_idx].filename)
+                    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    new_episode_files[file_idx].save(save_path)
+                    ep_images_list.append(f"uploads/{filename}")
+                    file_idx += 1
+                    # Only one file per episode unless user selects multiple for one episode
+                    break
+                ep_images = json.dumps(ep_images_list)
+                ep_overall = float(new_episode_overalls[i]) if new_episode_overalls[i] and new_episode_overalls[i].strip() else None
+                ep_animation = float(new_episode_animations[i]) if new_episode_animations[i] and new_episode_animations[i].strip() else None
+                ep_story = float(new_episode_stories[i]) if new_episode_stories[i] and new_episode_stories[i].strip() else None
 
                 db.execute("""
                     INSERT INTO anime_episodes (
@@ -579,6 +635,13 @@ def edit_detail(anime_id):
             else:
                 name = request.form.get(f"waifu_name_{wid}")
                 image = request.form.get(f"waifu_image_{wid}")
+                # Handle waifu image upload
+                waifu_file = request.files.get(f"waifu_image_upload_{wid}")
+                if waifu_file and waifu_file.filename:
+                    filename = secure_filename(waifu_file.filename)
+                    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    waifu_file.save(save_path)
+                    image = f"uploads/{filename}"
                 note = request.form.get(f"waifu_note_{wid}")
                 db.execute("""
                     UPDATE anime_waifus
@@ -590,10 +653,17 @@ def edit_detail(anime_id):
         new_waifu_names = request.form.getlist("waifu_name")
         new_waifu_images = request.form.getlist("waifu_image")
         new_waifu_notes = request.form.getlist("waifu_note")
+        waifu_files = request.files.getlist("waifu_image_upload")
         for i in range(len(new_waifu_names)):
             name = new_waifu_names[i]
             image = new_waifu_images[i]
             note = new_waifu_notes[i]
+            # Handle waifu image upload
+            if waifu_files and len(waifu_files) > i and waifu_files[i] and waifu_files[i].filename:
+                filename = secure_filename(waifu_files[i].filename)
+                save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                waifu_files[i].save(save_path)
+                image = f"uploads/{filename}"
             if name:
                 db.execute("""
                     INSERT INTO anime_waifus (anime_id, name, image, note)
@@ -609,6 +679,13 @@ def edit_detail(anime_id):
             else:
                 name = request.form.get(f"husbando_name_{hid}")
                 image = request.form.get(f"husbando_image_{hid}")
+                # Handle husbando image upload
+                husbando_file = request.files.get(f"husbando_image_upload_{hid}")
+                if husbando_file and husbando_file.filename:
+                    filename = secure_filename(husbando_file.filename)
+                    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    husbando_file.save(save_path)
+                    image = f"uploads/{filename}"
                 note = request.form.get(f"husbando_note_{hid}")
                 db.execute("""
                     UPDATE anime_husbandos
@@ -620,10 +697,17 @@ def edit_detail(anime_id):
         new_husbando_names = request.form.getlist("husbando_name")
         new_husbando_images = request.form.getlist("husbando_image")
         new_husbando_notes = request.form.getlist("husbando_note")
+        husbando_files = request.files.getlist("husbando_image_upload")
         for i in range(len(new_husbando_names)):
             name = new_husbando_names[i]
             image = new_husbando_images[i]
             note = new_husbando_notes[i]
+            # Handle husbando image upload
+            if husbando_files and len(husbando_files) > i and husbando_files[i] and husbando_files[i].filename:
+                filename = secure_filename(husbando_files[i].filename)
+                save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                husbando_files[i].save(save_path)
+                image = f"uploads/{filename}"
             if name:
                 db.execute("""
                     INSERT INTO anime_husbandos (anime_id, name, image, note)
@@ -644,7 +728,6 @@ def edit_detail(anime_id):
             image_list = ", ".join(json.loads(detail[3]))
         except:
             image_list = detail[3]
-
 
     db.execute("""
         SELECT id, episode_number, episode_note, episode_images,
@@ -688,28 +771,42 @@ def edit_detail(anime_id):
         existing_husbandos=existing_husbandos
     )
 
-
 @app.route("/list_detail")
 @login_required
 def list_detail():
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
-    db = conn.cursor()
+    conn = get_db()
+    db = conn.cursor(cursor_factory=RealDictCursor)
     user_id = session.get("user_id")
+
     db.execute("""
-        SELECT a.*, d.extra_notes, d.images, d.story_rating, d.visual_rating, d.sound_rating
+        SELECT a.id, a.title, a.rating, a.thoughts,
+               d.extra_notes, d.poster_url, d.images
         FROM anime a
         LEFT JOIN anime_detail d ON a.id = d.anime_id
         WHERE a.user_id = %s
         ORDER BY a.id DESC
     """, (user_id,))
     anime_list = db.fetchall()
-    return render_template("list_detail.html", anime_list=anime_list)
+
+    # Safely process the 'images' JSON string in Python
+    for anime in anime_list:
+        images_data = anime.get('images')
+        if images_data and isinstance(images_data, str):
+            try:
+                # Ensure the loaded data is a list
+                loaded_images = json.loads(images_data)
+                anime['images'] = loaded_images if isinstance(loaded_images, list) else []
+            except (json.JSONDecodeError, TypeError):
+                anime['images'] = []
+        # If it's not a string (e.g., already a list, or None), ensure it's a list
+        elif not isinstance(images_data, list):
+            anime['images'] = []
+
+    # Get anime IDs that have details
+    db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = %s", (user_id,))
+    detail_ids = set(row['anime_id'] for row in db.fetchall())
+
+    return render_template("list_detail.html", anime_list=anime_list, detail_ids=detail_ids)
 
 @app.template_filter('loads')
 def json_loads_filter(s):
@@ -725,13 +822,7 @@ def characters():
     query = "%" + search + "%" if search else "%"
     user_id = session.get("user_id")
 
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
 
     # Fetch waifus (only from user's anime)
@@ -765,13 +856,7 @@ def toggle_star(character_type, char_id):
     table = "anime_waifus" if character_type == "waifu" else "anime_husbandos"
     user_id = session.get("user_id")
 
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     
     # Only allow toggling stars for characters from user's anime
@@ -795,13 +880,7 @@ def export():
     writer.writerow(["id", "title", "rating", "thoughts", "date", "sequel", "details_url", "background_url"])
 
     # Get data and write rows (only for current user)
-    conn = psycopg2.connect(
-            dbname="anime_db_7a6a",
-            user="anime_db_7a6a_user",
-            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-            port="5432"
-        )
+    conn = get_db()
     db = conn.cursor()
     user_id = session.get("user_id")
     db.execute("SELECT * FROM anime WHERE user_id = %s ORDER BY id DESC", (user_id,))
@@ -875,7 +954,28 @@ def logout():
     flash("Logged out successfully.")
     return redirect("/")
 
-
+@app.route("/test_upload", methods=["GET", "POST"])
+def test_upload():
+    if request.method == "POST":
+        uploaded_files = request.files.getlist("image_uploads")
+        results = []
+        for file in uploaded_files:
+            if file and file.filename:
+                try:
+                    filename = secure_filename(file.filename)
+                    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    file.save(save_path)
+                    results.append(f"Successfully uploaded: {filename}")
+                except Exception as e:
+                    results.append(f"Error uploading {file.filename}: {e}")
+        return {"results": results}
+    
+    return """
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="image_uploads" multiple accept="image/*">
+        <button type="submit">Upload</button>
+    </form>
+    """
 
 if __name__ == "__main__":
     init_db()

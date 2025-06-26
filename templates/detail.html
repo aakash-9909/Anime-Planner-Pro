@@ -14,7 +14,7 @@
 
         {% if detail and detail[10] %}
         <div style="max-width: 220px;" class="ms-auto">
-            <img src="{{ detail[10] }}" class="img-fluid rounded shadow" alt="Anime Poster">
+            <img src="{{ detail[10] if detail[10].startswith('http') else url_for('static', filename=detail[10]) }}" class="img-fluid rounded shadow" alt="Anime Poster">
         </div>
         {% endif %}
     </div>
@@ -71,7 +71,7 @@
         background-size: cover;
         background-position: center;">
         <blockquote class="blockquote mb-0 fst-italic">
-            “{{ detail[7] }}”
+            "{{ detail[7] }}"
         </blockquote>
     </div>
     {% endif %}
@@ -103,9 +103,11 @@
                     {% for url in images %}
                     <div class="swiper-slide">
                         {% if url.startswith('http') %}
-                            <img src="{{ url }}" class="img-fluid rounded shadow" alt="Anime Image">
+                            <img src="{{ url }}" class="img-fluid rounded shadow" alt="Anime Image" 
+                                 onerror="this.style.display='none'; this.parentElement.style.display='none';">
                         {% else %}
-                            <img src="{{ url_for('static', filename=url) }}" class="img-fluid rounded shadow" alt="Uploaded Image">
+                            <img src="{{ url_for('static', filename=url) }}" class="img-fluid rounded shadow" alt="Uploaded Image"
+                                 onerror="this.style.display='none'; this.parentElement.style.display='none';">
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -118,16 +120,16 @@
 
         <!-- Grid Gallery -->
         <div id="gridGallery" style="display: none;">
-            <div class="row g-3">
+            <div class="row">
                 {% for url in images %}
-                <div class="col-6 col-md-4 col-lg-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        {% if url.startswith('http') %}
-                            <img src="{{ url }}" class="card-img-top rounded" alt="Anime Image">
-                        {% else %}
-                            <img src="{{ url_for('static', filename=url) }}" class="card-img-top rounded" alt="Uploaded Image">
-                        {% endif %}
-                    </div>
+                <div class="col-12">
+                    {% if url.startswith('http') %}
+                        <img src="{{ url }}" class="img-fluid rounded shadow" alt="Anime Image"
+                             onerror="this.style.display='none'; this.parentElement.style.display='none';">
+                    {% else %}
+                        <img src="{{ url_for('static', filename=url) }}" class="img-fluid rounded shadow" alt="Uploaded Image"
+                             onerror="this.style.display='none'; this.parentElement.style.display='none';">
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -188,7 +190,7 @@
                     <div class="row g-3 mb-3">
                         {% for img in ep.images %}
                         <div class="col-6 col-md-4 col-lg-3">
-                            <img src="{{ img }}" class="img-fluid rounded shadow" alt="Episode Image">
+                            <img src="{{ img if img.startswith('http') else url_for('static', filename=img) }}" class="img-fluid rounded shadow" alt="Episode Image">
                         </div>
                         {% endfor %}
                     </div>
@@ -326,45 +328,61 @@
 
 <!-- Swiper Script -->
 <script>
-  const swiper = new Swiper(".mySwiper", {
-    slidesPerView: 1,
-    spaceBetween: 20,
-    loop: true,
-    pagination: {
-      el: ".swiper-pagination",
-      clickable: true,
-    },
-    navigation: {
-      nextEl: ".swiper-button-next",
-      prevEl: ".swiper-button-prev",
-    },
-    breakpoints: {
-      768: { slidesPerView: 2 },
-      992: { slidesPerView: 3 }
-    }
-  });
-</script>
-
-<script>
   document.addEventListener("DOMContentLoaded", function () {
+    // Initialize Swiper
+    const swiperElement = document.querySelector(".mySwiper");
+    if (swiperElement) {
+      // Wait a bit for images to load
+      setTimeout(() => {
+        try {
+          const swiper = new Swiper(".mySwiper", {
+            slidesPerView: 1,
+            spaceBetween: 30,
+            loop: true,
+            pagination: {
+              el: ".swiper-pagination",
+              clickable: true,
+            },
+            navigation: {
+              nextEl: ".swiper-button-next",
+              prevEl: ".swiper-button-prev",
+            },
+            on: {
+              init: function () {
+                console.log("Swiper initialized successfully");
+              },
+              slideChange: function () {
+                console.log("Slide changed to", this.activeIndex);
+              }
+            }
+          });
+        } catch (error) {
+          console.error("Error initializing Swiper:", error);
+        }
+      }, 500);
+    }
+
+    // Gallery toggle functionality
     const sliderBtn = document.getElementById("sliderBtn");
     const gridBtn = document.getElementById("gridBtn");
     const sliderGallery = document.getElementById("sliderGallery");
     const gridGallery = document.getElementById("gridGallery");
 
-    sliderBtn.addEventListener("click", function () {
-      sliderGallery.style.display = "block";
-      gridGallery.style.display = "none";
-      sliderBtn.classList.add("active");
-      gridBtn.classList.remove("active");
-    });
+    if (sliderBtn && gridBtn && sliderGallery && gridGallery) {
+      sliderBtn.addEventListener("click", function () {
+        sliderGallery.style.display = "block";
+        gridGallery.style.display = "none";
+        sliderBtn.classList.add("active");
+        gridBtn.classList.remove("active");
+      });
 
-    gridBtn.addEventListener("click", function () {
-      sliderGallery.style.display = "none";
-      gridGallery.style.display = "block";
-      gridBtn.classList.add("active");
-      sliderBtn.classList.remove("active");
-    });
+      gridBtn.addEventListener("click", function () {
+        sliderGallery.style.display = "none";
+        gridGallery.style.display = "block";
+        gridBtn.classList.add("active");
+        sliderBtn.classList.remove("active");
+      });
+    }
   });
 </script>
 

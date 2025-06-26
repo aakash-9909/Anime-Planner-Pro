@@ -3,12 +3,100 @@
 {% block title %}Welcome{% endblock %}
 
 {% block main %}
-<div class="text-center">
-    <h1 class="mb-4">Welcome to AnimePlanner 🌸</h1>
-    <p class="lead">Log your favorite anime, rate them, and reflect on what you watched!</p>
-    <div class="mt-4 d-grid gap-2 col-md-4 mx-auto">
-        <a href="/add" class="btn btn-outline-primary">Add a New Anime</a>
-        <a href="/preview" class="btn btn-primary">View My Anime List</a>
+<!-- Hero Section -->
+<div class="text-center py-5 position-relative" style="background: url('/static/images/extra_notes_bg.jpg') center/cover no-repeat; border-radius: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
+    <h1 class="mb-3 display-4 fw-bold text-white" style="text-shadow: 0 2px 12px #0008;">Welcome to AnimePlanner 🌸</h1>
+    <p class="lead text-white-50 mb-4" style="text-shadow: 0 1px 8px #0007;">Log, rate, and reflect on your anime journey in style!</p>
+    <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
+        <a href="/add" class="btn btn-lg btn-outline-light px-4">Add a New Anime</a>
+        <a href="/preview" class="btn btn-lg btn-primary px-4">View My Anime List</a>
     </div>
 </div>
+
+<!-- Swiper Carousel -->
+<div class="my-5">
+    <div class="swiper">
+        <div class="swiper-wrapper">
+            <div class="swiper-slide"><img src="/static/images/card.jpg" alt="Anime Card"></div>
+            <div class="swiper-slide"><img src="/static/images/extra_notes_bg.jpg" alt="Notes"></div>
+            <div class="swiper-slide"><img src="/static/images/quote_bg.jpg" alt="Quote"></div>
+            <div class="swiper-slide"><img src="/static/ai.jpg" alt="AI"></div>
+            <div class="swiper-slide"><img src="/static/mak.jpg" alt="Mak"></div>
+            <div class="swiper-slide"><img src="/static/wa.jpg" alt="Wa"></div>
+        </div>
+        <!-- Add Pagination -->
+        <div class="swiper-pagination"></div>
+        <!-- Add Navigation -->
+        <div class="swiper-button-next"></div>
+        <div class="swiper-button-prev"></div>
+    </div>
+</div>
+
+<!-- Features Row -->
+<div class="row text-center mb-5 g-4">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm gallery-card">
+            <div class="card-body">
+                <h5 class="card-title">📚 Log Anime</h5>
+                <p class="card-text">Keep track of every anime you watch, from classics to the latest hits.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm gallery-card">
+            <div class="card-body">
+                <h5 class="card-title">⭐ Rate & Reflect</h5>
+                <p class="card-text">Rate your favorites and jot down your thoughts, reviews, or memorable moments.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm gallery-card">
+            <div class="card-body">
+                <h5 class="card-title">🖼️ Visual Gallery</h5>
+                <p class="card-text">Enjoy a beautiful gallery of your anime posters and covers.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Motivational Anime Quote -->
+<div class="text-center my-5">
+    <blockquote class="blockquote px-4 py-3" style="background: url('/static/images/quote_bg.jpg') center/cover no-repeat; border-radius: 1.5rem; color: #fff; text-shadow: 0 2px 8px #0007; max-width: 700px; margin: auto;">
+        <p class="mb-2 fs-4">“{{ quote.text }}”</p>
+        <footer class="blockquote-footer text-white-50">{{ quote.author }} <cite title="{{ quote.anime }}">{{ quote.anime }}</cite></footer>
+    </blockquote>
+</div>
+
+<!-- Random Image Gallery -->
+{% if gallery_images %}
+<div class="my-5">
+    <h3 class="text-center mb-4">Random Anime Gallery</h3>
+    <div class="row g-4 justify-content-center">
+        {% for img in gallery_images %}
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card shadow-sm gallery-card h-100">
+                <img src="/static/{{ img }}" class="card-img-top" alt="Anime Image" style="max-height: 250px; object-fit: cover; border-radius: 1rem;">
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.Swiper) {
+            new Swiper('.swiper', {
+                loop: true,
+                pagination: { el: '.swiper-pagination', clickable: true },
+                navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+                autoplay: { delay: 3500, disableOnInteraction: false },
+            });
+        }
+    });
+</script>
 {% endblock %}
