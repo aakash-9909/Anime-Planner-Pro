@@ -22,8 +22,8 @@ def get_db():
     return psycopg2.connect(
         dbname="anime_db_7a6a",
         user="anime_db_7a6a_user",
-        password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-        host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+        password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+        host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
         port="5432"
     )
 
@@ -149,8 +149,8 @@ def add():
         conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
         db = conn.cursor()
@@ -170,8 +170,8 @@ def add():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -181,12 +181,12 @@ def add():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
-    db.execute("UPDATE anime SET rating = 0 WHERE rating IS NULL OR rating = ''")
+    db.execute("UPDATE anime SET rating = 0 WHERE rating IS NULL")
     conn.commit()
 
 
@@ -207,8 +207,8 @@ def preview():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -234,8 +234,8 @@ def edit(anime_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -279,8 +279,8 @@ def delete(anime_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -315,8 +315,8 @@ def list_view():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -344,8 +344,8 @@ def detail(anime_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -420,8 +420,8 @@ def edit_detail(anime_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -656,8 +656,8 @@ def list_detail():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -685,8 +685,8 @@ def characters():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -723,8 +723,8 @@ def toggle_star(character_type, char_id):
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
@@ -746,8 +746,8 @@ def export():
     conn = psycopg2.connect(
             dbname="anime_db_7a6a",
             user="anime_db_7a6a_user",
-            password="yLOWW0zzymJRzP00L7susznDTNoYegfbE",
-            host="dpg-d1e7jk6mcj7s73a1r5fg-a",
+            password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
+            host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
             port="5432"
         )
     db = conn.cursor()
