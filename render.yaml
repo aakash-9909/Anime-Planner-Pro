@@ -8,3 +8,5 @@ services:
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: DATABASE_URL
+        value: postgres://anime_db_7a6a_user:LOWW0zzymJRzP00L7susznDTNoYegfbE@dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com:5432/anime_db_7a6a

@@ -61,14 +61,14 @@ def init_db():
         with conn.cursor() as db:
             db.execute("""
                 CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL
                 )
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     title TEXT NOT NULL,
                     rating REAL,
                     thoughts TEXT,
@@ -82,13 +82,13 @@ def init_db():
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS sequel (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     name TEXT UNIQUE NOT NULL
                 )
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_detail (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     anime_id INTEGER NOT NULL,
                     extra_notes TEXT,
                     images TEXT,
@@ -105,7 +105,7 @@ def init_db():
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_episodes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     anime_id INTEGER,
                     episode_number INTEGER,
                     episode_note TEXT,
@@ -118,23 +118,23 @@ def init_db():
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_husbandos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     anime_id INTEGER NOT NULL,
                     name TEXT,
                     image TEXT,
                     note TEXT,
-                    starred INTEGER DEFAULT 0,
+                    starred BOOLEAN DEFAULT FALSE,
                     FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
                 )
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS anime_waifus (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     anime_id INTEGER NOT NULL,
                     name TEXT,
                     image TEXT,
                     note TEXT,
-                    starred INTEGER DEFAULT 0,
+                    starred BOOLEAN DEFAULT FALSE,
                     FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
                 )
             """)
@@ -313,7 +313,8 @@ def edit(anime_id):
         return redirect("/preview")
 
     # Use RealDictCursor for GET to make template access consistent
-    db_dict = get_db()
+    conn = get_db()
+    db_dict = conn.cursor(cursor_factory=RealDictCursor)
     db_dict.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
     anime = db_dict.fetchone()
     
