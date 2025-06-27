@@ -1,7 +1,6 @@
-from flask import Flask, render_template, request, redirect, flash, session, url_for, Response
+from flask import Flask, render_template, request, redirect, flash, session, url_for, Response, send_file
 from flask_session import Session
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import sqlite3
 import os
 from datetime import datetime
 import csv
@@ -11,6 +10,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import random
+import zipfile
 
 # Configure application
 app = Flask(__name__)
@@ -36,16 +36,22 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-# DB connection helper
-# Restore original get_db()
+# DB connection helper for SQLite
 def get_db():
-    return psycopg2.connect(
-        dbname="anime_db_7a6a",
-        user="anime_db_7a6a_user",
-        password="LOWW0zzymJRzP00L7susznDTNoYegfbE",
-        host="dpg-d1e7jk6mcj7s73a1r5fg-a.oregon-postgres.render.com",
-        port="5432"
-    )
+    return sqlite3.connect("anime.db")
+
+# Helper function to convert SQLite rows to dictionaries
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
+# Helper function to get database with dictionary factory
+def get_db_dict():
+    conn = sqlite3.connect("anime.db")
+    conn.row_factory = dict_factory
+    return conn
 
 # Custom Jinja filter
 @app.template_filter('datetimeformat')
@@ -55,90 +61,92 @@ def datetimeformat(value, format='%b %Y'):
     except:
         return value
 
-# Fix CREATE TABLES with SERIAL and PostgreSQL syntax
+# Create tables with SQLite syntax
 def init_db():
-    with get_db() as conn:
-        with conn.cursor() as db:
-            db.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL
-                )
-            """)
-            db.execute("""
-                CREATE TABLE IF NOT EXISTS anime (
-                    id SERIAL PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    rating REAL,
-                    thoughts TEXT,
-                    date TEXT,
-                    sequel TEXT,
-                    details_url TEXT,
-                    background_url TEXT,
-                    user_id INTEGER,
-                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
-                )
-            """)
-            db.execute("""
-                CREATE TABLE IF NOT EXISTS sequel (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT UNIQUE NOT NULL
-                )
-            """)
-            db.execute("""
-                CREATE TABLE IF NOT EXISTS anime_detail (
-                    id SERIAL PRIMARY KEY,
-                    anime_id INTEGER NOT NULL,
-                    extra_notes TEXT,
-                    images TEXT,
-                    story_rating REAL,
-                    visual_rating REAL,
-                    sound_rating REAL,
-                    lessons TEXT,
-                    rating_note TEXT,
-                    favorite_episodes TEXT,
-                    poster_url TEXT,
-                    background_url TEXT,
-                    FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
-                )
-            """)
-            db.execute("""
-                CREATE TABLE IF NOT EXISTS anime_episodes (
-                    id SERIAL PRIMARY KEY,
-                    anime_id INTEGER,
-                    episode_number INTEGER,
-                    episode_note TEXT,
-                    episode_images TEXT,
-                    rating_overall REAL,
-                    rating_animation REAL,
-                    rating_story REAL,
-                    FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
-                )
-            """)
-            db.execute("""
-                CREATE TABLE IF NOT EXISTS anime_husbandos (
-                    id SERIAL PRIMARY KEY,
-                    anime_id INTEGER NOT NULL,
-                    name TEXT,
-                    image TEXT,
-                    note TEXT,
-                    starred BOOLEAN DEFAULT FALSE,
-                    FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
-                )
-            """)
-            db.execute("""
-                CREATE TABLE IF NOT EXISTS anime_waifus (
-                    id SERIAL PRIMARY KEY,
-                    anime_id INTEGER NOT NULL,
-                    name TEXT,
-                    image TEXT,
-                    note TEXT,
-                    starred BOOLEAN DEFAULT FALSE,
-                    FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
-                )
-            """)
-            conn.commit()
+    conn = get_db()
+    db = conn.cursor()
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS anime (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            rating REAL,
+            thoughts TEXT,
+            date TEXT,
+            sequel TEXT,
+            details_url TEXT,
+            background_url TEXT,
+            user_id INTEGER,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS sequel (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS anime_detail (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            anime_id INTEGER NOT NULL,
+            extra_notes TEXT,
+            images TEXT,
+            story_rating REAL,
+            visual_rating REAL,
+            sound_rating REAL,
+            lessons TEXT,
+            rating_note TEXT,
+            favorite_episodes TEXT,
+            poster_url TEXT,
+            background_url TEXT,
+            FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS anime_episodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            anime_id INTEGER,
+            episode_number INTEGER,
+            episode_note TEXT,
+            episode_images TEXT,
+            rating_overall REAL,
+            rating_animation REAL,
+            rating_story REAL,
+            FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS anime_husbandos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            anime_id INTEGER NOT NULL,
+            name TEXT,
+            image TEXT,
+            note TEXT,
+            starred INTEGER DEFAULT 0,
+            FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS anime_waifus (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            anime_id INTEGER NOT NULL,
+            name TEXT,
+            image TEXT,
+            note TEXT,
+            starred INTEGER DEFAULT 0,
+            FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
+        )
+    """)
+    conn.commit()
+    db.close()
+    conn.close()
 
 @app.route("/")
 def index():
@@ -203,6 +211,7 @@ def add():
         if not details_url:
             details_url = request.form.get("details_url") or None
 
+        # --- Fix background image upload ---
         background_file = request.files.get("background_upload") if "background_upload" in request.files else None
         if background_file and background_file.filename:
             filename = secure_filename(background_file.filename)
@@ -212,43 +221,40 @@ def add():
 
         db.execute("""
             INSERT INTO anime (title, rating, thoughts, date, sequel, details_url, background_url, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (title, rating, thoughts, date, sequel, details_url, background_url, user_id))
-        anime_id = db.fetchone()[0]
+        anime_id = db.lastrowid
 
-        # Now, create the corresponding anime_detail entry
-        db.execute(
-            """
-            INSERT INTO anime_detail (anime_id, poster_url, background_url)
-            VALUES (%s, %s, %s)
-            """,
-            (anime_id, poster_url, background_url)
-        )
+        # --- Remove automatic anime_detail creation ---
+        # Only create anime_detail when user adds details in edit_detail
 
         if sequel:
-            db.execute("INSERT INTO sequel (name) VALUES (%s)", (sequel,))
+            db.execute("INSERT INTO sequel (name) VALUES (?)", (sequel,))
 
         conn.commit()
+        db.close()
+        conn.close()
 
         flash("Anime added successfully!")
         return redirect("/preview")
+    
+    # GET method - show the form
     conn = get_db()
     db = conn.cursor()
     sort_by_rating = request.args.get("sort_by_rating")
     user_id = session.get("user_id")
 
-    conn = get_db()
-    db = conn.cursor()
-    db.execute("UPDATE anime SET rating = 0 WHERE rating IS NULL AND user_id = %s", (user_id,))
+    db.execute("UPDATE anime SET rating = 0 WHERE rating IS NULL AND user_id = ?", (user_id,))
     conn.commit()
 
     if sort_by_rating:
-        db.execute("SELECT title FROM anime WHERE rating IS NOT NULL AND user_id = %s ORDER BY rating DESC", (user_id,))
+        db.execute("SELECT title FROM anime WHERE rating IS NOT NULL AND user_id = ? ORDER BY rating DESC", (user_id,))
     else:
-        db.execute("SELECT DISTINCT title FROM anime WHERE user_id = %s ORDER BY title", (user_id,))
+        db.execute("SELECT DISTINCT title FROM anime WHERE user_id = ? ORDER BY title", (user_id,))
 
     sequel_list = [row[0] for row in db.fetchall()]
+    db.close()
+    conn.close()
 
     return render_template("add.html", sequel_list=sequel_list, sort_active=bool(sort_by_rating))
 
@@ -256,8 +262,8 @@ def add():
 @login_required
 def preview():
     sort_by_rating = request.args.get("sort_by_rating")
-    conn = get_db()
-    db = conn.cursor(cursor_factory=RealDictCursor)
+    conn = get_db_dict()
+    db = conn.cursor()
     user_id = session.get("user_id")
     
     order_clause = "ORDER BY a.rating DESC" if sort_by_rating else "ORDER BY a.id DESC"
@@ -266,22 +272,22 @@ def preview():
         SELECT a.*, d.poster_url
         FROM anime a
         LEFT JOIN anime_detail d ON a.id = d.anime_id
-        WHERE a.user_id = %s
+        WHERE a.user_id = ?
         {order_clause}
     """, (user_id,))
     anime_list = db.fetchall()
 
     # Get anime IDs that have details
-    db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = %s", (user_id,))
+    db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = ?", (user_id,))
     detail_ids = set(row['anime_id'] for row in db.fetchall())
 
+    db.close()
+    conn.close()
     return render_template("preview.html", anime_list=anime_list, detail_ids=detail_ids, sort_active=bool(sort_by_rating))
 
 @app.route("/edit/<int:anime_id>", methods=["GET", "POST"])
 @login_required
 def edit(anime_id):
-    conn = get_db()
-    db = conn.cursor()
     user_id = session.get("user_id")
     
     if request.method == "POST":
@@ -298,32 +304,56 @@ def edit(anime_id):
         elif not date:
             date = datetime.today().strftime('%Y-%m-%d')
 
+        # --- Handle background image upload ---
+        background_file = request.files.get("background_upload") if "background_upload" in request.files else None
+        if background_file and background_file.filename:
+            filename = secure_filename(background_file.filename)
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            background_file.save(save_path)
+            background_url = f"uploads/{filename}"
+        # If no new file, use the value from the form (could be a URL or a local path)
+
+        conn = get_db()
+        db = conn.cursor()
+        
         # Update main anime table (without details_url)
         db.execute("""
             UPDATE anime
-            SET title = %s, rating = %s, thoughts = %s, date = %s, sequel = %s, background_url = %s
-            WHERE id = %s AND user_id = %s
+            SET title = ?, rating = ?, thoughts = ?, date = ?, sequel = ?, background_url = ?
+            WHERE id = ? AND user_id = ?
         """, (title, rating, thoughts, date, sequel, background_url, anime_id, user_id))
 
         if sequel:
-            db.execute("INSERT INTO sequel (name) VALUES (%s)", (sequel,))
+            db.execute("INSERT INTO sequel (name) VALUES (?)", (sequel,))
 
         conn.commit()
+        db.close()
+        conn.close()
         flash("Anime updated successfully!")
         return redirect("/preview")
 
-    # Use RealDictCursor for GET to make template access consistent
-    conn = get_db()
-    db_dict = conn.cursor(cursor_factory=RealDictCursor)
-    db_dict.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
+    # Use dictionary factory for GET to make template access consistent
+    conn_dict = get_db_dict()
+    db_dict = conn_dict.cursor()
+    db_dict.execute("SELECT * FROM anime WHERE id = ? AND user_id = ?", (anime_id, user_id))
     anime = db_dict.fetchone()
     
     if not anime:
+        db_dict.close()
+        conn_dict.close()
         flash("Anime not found or access denied.")
         return redirect("/preview")
-        
-    db.execute("SELECT DISTINCT title FROM anime WHERE user_id = %s ORDER BY title", (user_id,))
+    
+    # Get sequel list for dropdown
+    conn = get_db()
+    db = conn.cursor()
+    db.execute("SELECT DISTINCT title FROM anime WHERE user_id = ? ORDER BY title", (user_id,))
     sequel_list = [row[0] for row in db.fetchall()]
+    
+    db.close()
+    conn.close()
+    db_dict.close()
+    conn_dict.close()
 
     return render_template("edit.html", anime=anime, sequel_list=sequel_list)
 
@@ -333,8 +363,10 @@ def delete(anime_id):
     conn = get_db()
     db = conn.cursor()
     user_id = session.get("user_id")
-    db.execute("DELETE FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
+    db.execute("DELETE FROM anime WHERE id = ? AND user_id = ?", (anime_id, user_id))
     conn.commit()
+    db.close()
+    conn.close()
     flash("Anime deleted successfully!")
     return redirect("/preview")
 
@@ -357,7 +389,7 @@ def list_view():
     user_id = session.get("user_id")
 
     # Build SQL dynamically
-    base_query = "SELECT id, title, rating, date FROM anime WHERE user_id = %s"
+    base_query = "SELECT id, title, rating, date FROM anime WHERE user_id = ?"
     if filter_null == "nonull":
         base_query += f" AND {sort_column} IS NOT NULL"
 
@@ -367,6 +399,8 @@ def list_view():
     db = conn.cursor()
     db.execute(base_query, (user_id,))
     anime_list = db.fetchall()
+    db.close()
+    conn.close()
 
     return render_template("list.html",
         anime_list=anime_list,
@@ -392,15 +426,17 @@ def detail(anime_id):
     user_id = session.get("user_id")
 
     # Fetch main anime data (only for current user)
-    db.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
+    db.execute("SELECT * FROM anime WHERE id = ? AND user_id = ?", (anime_id, user_id))
     anime = db.fetchone()
 
     if not anime:
+        db.close()
+        conn.close()
         flash("Anime not found or access denied.")
         return redirect("/preview")
 
     # Fetch detailed info
-    db.execute("SELECT * FROM anime_detail WHERE anime_id = %s", (anime_id,))
+    db.execute("SELECT * FROM anime_detail WHERE anime_id = ?", (anime_id,))
     detail = db.fetchone()
 
     # Decode image list
@@ -416,7 +452,7 @@ def detail(anime_id):
     # Fetch and format episodes
     db.execute("""
         SELECT episode_number, episode_note, episode_images, rating_overall, rating_animation, rating_story
-        FROM anime_episodes WHERE anime_id = %s ORDER BY episode_number ASC
+        FROM anime_episodes WHERE anime_id = ? ORDER BY episode_number ASC
     """, (anime_id,))
 
     episode_rows = db.fetchall()
@@ -436,12 +472,15 @@ def detail(anime_id):
             "story": ep_rating_story
         })
     # Fetch waifus
-    db.execute("SELECT name, image, note FROM anime_waifus WHERE anime_id = %s", (anime_id,))
+    db.execute("SELECT name, image, note FROM anime_waifus WHERE anime_id = ?", (anime_id,))
     waifus = [{"name": row[0], "image": row[1], "note": row[2]} for row in db.fetchall()]
 
     # Fetch husbandos
-    db.execute("SELECT name, image, note FROM anime_husbandos WHERE anime_id = %s", (anime_id,))
+    db.execute("SELECT name, image, note FROM anime_husbandos WHERE anime_id = ?", (anime_id,))
     husbandos = [{"name": row[0], "image": row[1], "note": row[2]} for row in db.fetchall()]
+
+    db.close()
+    conn.close()
 
     return render_template(
     "detail.html",
@@ -460,7 +499,7 @@ def edit_detail(anime_id):
     db = conn.cursor()
     user_id = session.get("user_id")
 
-    db.execute("SELECT * FROM anime WHERE id = %s AND user_id = %s", (anime_id, user_id))
+    db.execute("SELECT * FROM anime WHERE id = ? AND user_id = ?", (anime_id, user_id))
     anime = db.fetchone()
     if not anime:
         flash("Anime not found or access denied.")
@@ -525,29 +564,31 @@ def edit_detail(anime_id):
 
         try:
             # === Update or insert anime_detail ===
-            db.execute("SELECT id FROM anime_detail WHERE anime_id = %s", (anime_id,))
+            db.execute("SELECT id FROM anime_detail WHERE anime_id = ?", (anime_id,))
             exists = db.fetchone()
             if exists:
                 db.execute("""
                     UPDATE anime_detail
-                    SET extra_notes = %s, lessons = %s, favorite_episodes = %s, poster_url = %s, background_url = %s,
-                        images = %s, story_rating = %s, visual_rating = %s, sound_rating = %s, rating_note = %s
-                    WHERE anime_id = %s
+                    SET extra_notes = ?, lessons = ?, favorite_episodes = ?, poster_url = ?, background_url = ?,
+                        images = ?, story_rating = ?, visual_rating = ?, sound_rating = ?, rating_note = ?
+                    WHERE anime_id = ?
                 """, (
                     extra_notes, lessons, favorite_episodes, poster_url, background_url,
                     image_json, story_rating, visual_rating, sound_rating, rating_note,
                     anime_id
                 ))
             else:
-                db.execute("""
-                    INSERT INTO anime_detail (
+                # Only insert if at least one detail field is provided
+                if any([extra_notes, lessons, favorite_episodes, poster_url, background_url, image_json, story_rating, visual_rating, sound_rating, rating_note]):
+                    db.execute("""
+                        INSERT INTO anime_detail (
+                            anime_id, extra_notes, lessons, favorite_episodes, poster_url, background_url,
+                            images, story_rating, visual_rating, sound_rating, rating_note
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
                         anime_id, extra_notes, lessons, favorite_episodes, poster_url, background_url,
-                        images, story_rating, visual_rating, sound_rating, rating_note
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    anime_id, extra_notes, lessons, favorite_episodes, poster_url, background_url,
-                    image_json, story_rating, visual_rating, sound_rating, rating_note
-                ))
+                        image_json, story_rating, visual_rating, sound_rating, rating_note
+                    ))
         except Exception as e:
             print(f"Debug: Database error: {e}")
             flash(f"Database error: {str(e)}")
@@ -558,7 +599,7 @@ def edit_detail(anime_id):
         for eid in existing_ids:
             delete_flag = request.form.get(f"delete_episode_{eid}")
             if delete_flag:
-                db.execute("DELETE FROM anime_episodes WHERE id = %s", (eid,))
+                db.execute("DELETE FROM anime_episodes WHERE id = ?", (eid,))
             else:
                 ep_num = request.form.get(f"episode_number_{eid}")
                 ep_note = request.form.get(f"episode_note_{eid}")
@@ -579,9 +620,9 @@ def edit_detail(anime_id):
 
                 db.execute("""
                     UPDATE anime_episodes
-                    SET episode_number = %s, episode_note = %s, episode_images = %s,
-                        rating_overall = %s, rating_animation = %s, rating_story = %s
-                    WHERE id = %s
+                    SET episode_number = ?, episode_note = ?, episode_images = ?,
+                        rating_overall = ?, rating_animation = ?, rating_story = ?
+                    WHERE id = ?
                 """, (ep_num, ep_note, ep_images, ep_overall, ep_animation, ep_story, eid))
 
         # === Insert new episodes ===
@@ -619,7 +660,7 @@ def edit_detail(anime_id):
                     INSERT INTO anime_episodes (
                         anime_id, episode_number, episode_note, episode_images,
                         rating_overall, rating_animation, rating_story
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     anime_id, ep_num, ep_note, ep_images, ep_overall, ep_animation, ep_story))
             except Exception as e:
@@ -630,7 +671,7 @@ def edit_detail(anime_id):
         for wid in existing_waifu_ids:
             delete_flag = request.form.get(f"delete_waifu_{wid}")
             if delete_flag:
-                db.execute("DELETE FROM anime_waifus WHERE id = %s", (wid,))
+                db.execute("DELETE FROM anime_waifus WHERE id = ?", (wid,))
             else:
                 name = request.form.get(f"waifu_name_{wid}")
                 image = request.form.get(f"waifu_image_{wid}")
@@ -644,8 +685,8 @@ def edit_detail(anime_id):
                 note = request.form.get(f"waifu_note_{wid}")
                 db.execute("""
                     UPDATE anime_waifus
-                    SET name = %s, image = %s, note = %s
-                    WHERE id = %s
+                    SET name = ?, image = ?, note = ?
+                    WHERE id = ?
                 """, (name, image, note, wid))
 
         # === Insert new waifus ===
@@ -666,7 +707,7 @@ def edit_detail(anime_id):
             if name:
                 db.execute("""
                     INSERT INTO anime_waifus (anime_id, name, image, note)
-                    VALUES (%s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?)
                 """, (anime_id, name, image, note))
 
         # === Update or delete existing husbandos ===
@@ -674,7 +715,7 @@ def edit_detail(anime_id):
         for hid in existing_husbando_ids:
             delete_flag = request.form.get(f"delete_husbando_{hid}")
             if delete_flag:
-                db.execute("DELETE FROM anime_husbandos WHERE id = %s", (hid,))
+                db.execute("DELETE FROM anime_husbandos WHERE id = ?", (hid,))
             else:
                 name = request.form.get(f"husbando_name_{hid}")
                 image = request.form.get(f"husbando_image_{hid}")
@@ -688,8 +729,8 @@ def edit_detail(anime_id):
                 note = request.form.get(f"husbando_note_{hid}")
                 db.execute("""
                     UPDATE anime_husbandos
-                    SET name = %s, image = %s, note = %s
-                    WHERE id = %s
+                    SET name = ?, image = ?, note = ?
+                    WHERE id = ?
                 """, (name, image, note, hid))
 
         # === Insert new husbandos ===
@@ -710,15 +751,17 @@ def edit_detail(anime_id):
             if name:
                 db.execute("""
                     INSERT INTO anime_husbandos (anime_id, name, image, note)
-                    VALUES (%s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?)
                 """, (anime_id, name, image, note))
 
         conn.commit()
+        db.close()
+        conn.close()
         flash("Details updated successfully!")
         return redirect(url_for("detail", anime_id=anime_id))
 
     # === GET method ===
-    db.execute("SELECT * FROM anime_detail WHERE anime_id = %s", (anime_id,))
+    db.execute("SELECT * FROM anime_detail WHERE anime_id = ?", (anime_id,))
     detail = db.fetchone()
 
     image_list = ""
@@ -732,7 +775,7 @@ def edit_detail(anime_id):
         SELECT id, episode_number, episode_note, episode_images,
                 rating_overall, rating_animation, rating_story
         FROM anime_episodes
-        WHERE anime_id = %s
+        WHERE anime_id = ?
         ORDER BY episode_number
     """, (anime_id,))
     rows = db.fetchall()
@@ -754,11 +797,14 @@ def edit_detail(anime_id):
             "story": story
         })
 
-    db.execute("SELECT id, name, image, note FROM anime_waifus WHERE anime_id = %s", (anime_id,))
+    db.execute("SELECT id, name, image, note FROM anime_waifus WHERE anime_id = ?", (anime_id,))
     existing_waifus = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3]} for row in db.fetchall()]
 
-    db.execute("SELECT id, name, image, note FROM anime_husbandos WHERE anime_id = %s", (anime_id,))
+    db.execute("SELECT id, name, image, note FROM anime_husbandos WHERE anime_id = ?", (anime_id,))
     existing_husbandos = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3]} for row in db.fetchall()]
+
+    db.close()
+    conn.close()
 
     return render_template(
         "edit_detail.html",
@@ -773,8 +819,8 @@ def edit_detail(anime_id):
 @app.route("/list_detail")
 @login_required
 def list_detail():
-    conn = get_db()
-    db = conn.cursor(cursor_factory=RealDictCursor)
+    conn = get_db_dict()
+    db = conn.cursor()
     user_id = session.get("user_id")
 
     db.execute("""
@@ -782,7 +828,7 @@ def list_detail():
                d.extra_notes, d.poster_url, d.images
         FROM anime a
         LEFT JOIN anime_detail d ON a.id = d.anime_id
-        WHERE a.user_id = %s
+        WHERE a.user_id = ?
         ORDER BY a.id DESC
     """, (user_id,))
     anime_list = db.fetchall()
@@ -802,9 +848,11 @@ def list_detail():
             anime['images'] = []
 
     # Get anime IDs that have details
-    db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = %s", (user_id,))
+    db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = ?", (user_id,))
     detail_ids = set(row['anime_id'] for row in db.fetchall())
 
+    db.close()
+    conn.close()
     return render_template("list_detail.html", anime_list=anime_list, detail_ids=detail_ids)
 
 @app.template_filter('loads')
@@ -829,7 +877,7 @@ def characters():
         SELECT w.id, w.name, w.image, w.note, w.starred, a.id, a.title
         FROM anime_waifus w
         JOIN anime a ON w.anime_id = a.id
-        WHERE w.name LIKE %s AND a.user_id = %s
+        WHERE w.name LIKE ? AND a.user_id = ?
         ORDER BY w.starred DESC, w.name
     """, (query, user_id))
     waifus = db.fetchall()
@@ -839,11 +887,13 @@ def characters():
         SELECT h.id, h.name, h.image, h.note, h.starred, a.id, a.title
         FROM anime_husbandos h
         JOIN anime a ON h.anime_id = a.id
-        WHERE h.name LIKE %s AND a.user_id = %s
+        WHERE h.name LIKE ? AND a.user_id = ?
         ORDER BY h.starred DESC, h.name
     """, (query, user_id))
     husbandos = db.fetchall()
 
+    db.close()
+    conn.close()
     return render_template("characters.html", waifus=waifus, husbandos=husbandos, search=search)
 
 @app.route("/toggle_star/<string:character_type>/<int:char_id>", methods=["POST"])
@@ -862,7 +912,7 @@ def toggle_star(character_type, char_id):
     db.execute(f"""
         UPDATE {table} 
         SET starred = NOT starred 
-        WHERE id = %s AND anime_id IN (SELECT id FROM anime WHERE user_id = %s)
+        WHERE id = ? AND anime_id IN (SELECT id FROM anime WHERE user_id = ?)
     """, (char_id, user_id))
     conn.commit()
 
@@ -871,33 +921,44 @@ def toggle_star(character_type, char_id):
 @app.route("/export")
 @login_required
 def export():
-    # Create string buffer
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    # Write header
-    writer.writerow(["id", "title", "rating", "thoughts", "date", "sequel", "details_url", "background_url"])
-
-    # Get data and write rows (only for current user)
-    conn = get_db()
-    db = conn.cursor()
-    user_id = session.get("user_id")
-    db.execute("SELECT * FROM anime WHERE user_id = %s ORDER BY id DESC", (user_id,))
-    rows = db.fetchall()
-
-    for row in rows:
-        # Replace None values with empty strings
-        clean_row = [cell if cell is not None else "" for cell in row]
-        writer.writerow(clean_row)
-
-    # Get CSV content
-    csv_content = output.getvalue()
-    output.close()
-
+    # Create in-memory zip
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        conn = get_db()
+        db = conn.cursor()
+        user_id = session.get("user_id")
+        # List of tables to export
+        tables = [
+            ("anime", "SELECT * FROM anime WHERE user_id = ? ORDER BY id DESC", (user_id,)),
+            ("anime_detail", "SELECT * FROM anime_detail WHERE anime_id IN (SELECT id FROM anime WHERE user_id = ?)", (user_id,)),
+            ("anime_episodes", "SELECT * FROM anime_episodes WHERE anime_id IN (SELECT id FROM anime WHERE user_id = ?)", (user_id,)),
+            ("anime_waifus", "SELECT * FROM anime_waifus WHERE anime_id IN (SELECT id FROM anime WHERE user_id = ?)", (user_id,)),
+            ("anime_husbandos", "SELECT * FROM anime_husbandos WHERE anime_id IN (SELECT id FROM anime WHERE user_id = ?)", (user_id,)),
+            ("sequel", "SELECT * FROM sequel", ()),
+            ("users", "SELECT * FROM users WHERE id = ?", (user_id,)),
+        ]
+        for table_name, query, params in tables:
+            db.execute(query, params)
+            rows = db.fetchall()
+            if not rows:
+                continue
+            # Get column names
+            col_names = [desc[0] for desc in db.description]
+            # Write CSV to string buffer
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+            writer.writerow(col_names)
+            for row in rows:
+                writer.writerow(row)
+            # Add CSV to zip
+            zipf.writestr(f"{table_name}.csv", csv_buffer.getvalue())
+        db.close()
+        conn.close()
+    zip_buffer.seek(0)
     return Response(
-        csv_content,
-        mimetype='text/csv',
-        headers={"Content-Disposition": "attachment; filename=anime_list.csv"}
+        zip_buffer.getvalue(),
+        mimetype='application/zip',
+        headers={"Content-Disposition": "attachment; filename=anime_backup.zip"}
     )
 
 @app.route("/register", methods=["GET", "POST"])
@@ -914,10 +975,12 @@ def register():
         hashed = generate_password_hash(password)
 
         try:
-            with get_db() as conn:
-                with conn.cursor() as db:
-                    db.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, hashed))
-                    conn.commit()
+            conn = get_db()
+            db = conn.cursor()
+            db.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, hashed))
+            conn.commit()
+            db.close()
+            conn.close()
             flash("Registered successfully!")
             return redirect("/login")
         except:
@@ -932,10 +995,11 @@ def login():
         username = request.form.get("username")
         password = request.form.get("password")
 
-        with get_db() as conn:
-            with conn.cursor() as db:
-                db.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
-                user = db.fetchone()
+        conn = get_db()
+        db = conn.cursor()
+        db.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+        user = db.fetchone()
+        db.close()
 
         if user and check_password_hash(user[1], password):
             session["user_id"] = user[0]
@@ -976,6 +1040,12 @@ def test_upload():
     </form>
     """
 
+@app.route("/export_db")
+@login_required
+def export_db():
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'anime.db')
+    return send_file(db_path, as_attachment=True, download_name='anime.db')
+
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    print("anime.db and all tables created!")

@@ -16,7 +16,8 @@
 </div>
 
 <div class="d-flex justify-content-center mb-4 gap-3 flex-wrap">
-    <a href="{{ url_for('export') }}" class="btn btn-outline-primary">📤 Export CSV</a>
+    <a href="{{ url_for('export') }}" class="btn btn-outline-primary">📤 Export CSVs (ZIP)</a>
+    <a href="{{ url_for('export_db') }}" class="btn btn-outline-warning">💾 Export Database</a>
     <input type="text" id="searchBox" class="form-control" placeholder="Search anime..." style="max-width: 300px;">
     <button class="btn btn-outline-secondary" id="toggleEdit">🔧 Show Edit/Delete</button>
     <button class="btn btn-outline-secondary" id="toggleDetail">✨ Show View/Add</button>
@@ -73,6 +74,7 @@
                     {% endif %}
                 </div>
                 <div class="position-absolute bottom-0 end-0 m-2 d-flex gap-2 detail-controls">
+                    {# Only show view/search icon if details exist #}
                     {% if anime.id in detail_ids %}
                         <a href="{{ url_for('detail', anime_id=anime.id) }}" class="btn btn-sm btn-light" title="View Details">🔍</a>
                     {% endif %}
