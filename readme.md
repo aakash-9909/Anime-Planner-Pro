@@ -2,7 +2,7 @@
 > codespace use python -m flask run
 
 >pkill -f flask
-> checker
+> checker again
 
 #### Video Demo:  <URL HERE>
 #### Description: An asthetic anime planner, i focused really on asthetic so all the features were changed multiple times...
