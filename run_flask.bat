@@ -2,70 +2,51 @@
 REM Change directory to the folder where this script is located
 cd /d "%~dp0"
 
-REM Auto pull functionality on startup
-echo Starting git operations...
+echo ========================================
+echo Starting Anime Planner with Git Sync
+echo ========================================
+echo.
 
-REM Check if this is a git repository
-git status >nul 2>&1
-if %errorlevel% neq 0 (
-    echo This is not a git repository. Skipping git operations.
-    goto :start_flask
-)
-
-REM Pull latest changes if available (ONLY on startup)
-echo Checking for updates...
-git pull origin main 2>nul
+REM Git pull on startup
+echo [1/4] Pulling latest changes...
+git pull origin main
 if %errorlevel% equ 0 (
-    echo Successfully pulled latest changes.
+    echo ✓ Successfully pulled latest changes
 ) else (
-    git pull origin master 2>nul
-    if %errorlevel% equ 0 (
-        echo Successfully pulled latest changes.
-    ) else (
-        echo No remote repository found or no updates available.
-    )
+    echo ✗ Failed to pull changes (continuing anyway)
 )
+echo.
 
-:start_flask
 REM Set Flask environment variables
 set FLASK_APP=app.py
 set FLASK_ENV=development
 
-echo Starting Flask application...
+echo [2/4] Starting Flask application...
+echo Press Ctrl+C to stop Flask and save changes
+echo.
+
 REM Run Flask
 python -m flask run
 
-REM Auto commit functionality on exit
 echo.
-echo Flask application stopped. Committing changes...
+echo ========================================
+echo Flask stopped. Saving changes...
+echo ========================================
 echo.
 
-REM Check if this is a git repository
-git status >nul 2>&1
-if %errorlevel% neq 0 (
-    echo This is not a git repository. Skipping commit.
-    goto :end
-)
-
-REM Add all changes
-echo Adding all changes...
+REM Git operations on exit
+echo [3/4] Adding all changes...
 git add .
 
-REM Check if there are changes to commit
-git diff --cached --quiet
-if %errorlevel% equ 0 (
-    echo No changes to commit.
-) else (
-    REM Commit changes with timestamp
-    echo Committing changes...
-    for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
-    set "YY=%dt:~2,2%" & set "YYYY=%dt:~0,4%" & set "MM=%dt:~4,2%" & set "DD=%dt:~6,2%"
-    set "HH=%dt:~8,2%" & set "Min=%dt:~10,2%" & set "Sec=%dt:~12,2%"
-    set "datestamp=%YYYY%-%MM%-%DD% %HH%:%Min%:%Sec%"
-    git commit -m "Auto commit: %datestamp%"
-    echo Changes committed successfully!
-)
+echo [4/4] Committing and pushing...
+REM Get timestamp
+for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
+set "datestamp=%dt:~0,4%-%dt:~4,2%-%dt:~6,2% %dt:~8,2%:%dt:~10,2%:%dt:~12,2%"
 
-:end
-REM Keep the window open after Flask stops
+git commit -m "%datestamp%"
+git push origin main
+
+echo.
+echo ✓ Git operations completed!
+echo.
 pause
