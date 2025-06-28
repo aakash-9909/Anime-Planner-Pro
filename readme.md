@@ -1,4 +1,8 @@
 # Anime Planner
+> codespace use python -m flask run
+
+>pkill -f flask
+
 #### Video Demo:  <URL HERE>
 #### Description: An asthetic anime planner, i focused really on asthetic so all the features were changed multiple times...
 > This is not a readme but rather me talking about various stuff lol the website can be easily navigated i dont think you need a manual for that i did the manual stuff in the last project so skipped this time......
