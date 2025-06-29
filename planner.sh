@@ -36,7 +36,7 @@ echo "Or press Ctrl+C (will kill entire script)"
 echo
 
 # Run Flask in background
-python -m flask run &
+python -m flask run --host=0.0.0.0 &
 FLASK_PID=$!
 
 echo "[3/3] Flask started in background (PID: $FLASK_PID)"
