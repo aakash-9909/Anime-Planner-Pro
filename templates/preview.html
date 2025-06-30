@@ -67,9 +67,9 @@
                             <p class="card-text"><a class="text-info" href="{{ anime.details_url }}" target="_blank">More Details</a></p>
                         {% endif %}
                     </div>
-                    {% if anime.poster_url %}
+                    {% if anime.display_poster_url %}
                     <div class="col-md-4 d-flex justify-content-end align-items-center">
-                        <img src="{{ anime.poster_url if anime.poster_url.startswith('http') else url_for('static', filename=anime.poster_url) }}" class="img-fluid rounded shadow" alt="Anime Poster" style="max-width: 220px; max-height: 320px;">
+                        <img src="{{ anime.display_poster_url if anime.display_poster_url.startswith('http') else url_for('static', filename=anime.display_poster_url) }}" class="img-fluid rounded shadow" alt="Anime Poster" style="max-width: 220px; max-height: 320px;">
                     </div>
                     {% endif %}
                 </div>

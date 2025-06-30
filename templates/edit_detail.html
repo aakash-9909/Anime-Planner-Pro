@@ -202,6 +202,18 @@
                 <label>Note</label>
                 <textarea name="waifu_note_{{ w.id }}" class="form-control" rows="2">{{ w.note }}</textarea>
             </div>
+            <div class="mb-2">
+                <label>Rating (1-6 stars)</label>
+                <select name="waifu_rating_{{ w.id }}" class="form-control">
+                    <option value="">No rating</option>
+                    <option value="1" {% if w.rating == 1 %}selected{% endif %}>⭐ (1 star)</option>
+                    <option value="2" {% if w.rating == 2 %}selected{% endif %}>⭐⭐ (2 stars)</option>
+                    <option value="3" {% if w.rating == 3 %}selected{% endif %}>⭐⭐⭐ (3 stars)</option>
+                    <option value="4" {% if w.rating == 4 %}selected{% endif %}>⭐⭐⭐⭐ (4 stars)</option>
+                    <option value="5" {% if w.rating == 5 %}selected{% endif %}>⭐⭐⭐⭐⭐ (5 stars)</option>
+                    <option value="6" {% if w.rating == 6 %}selected{% endif %}>⭐⭐⭐⭐⭐⭐ (6 stars)</option>
+                </select>
+            </div>
             <div class="text-end">
                 <label class="form-check-label text-danger">
                     <input type="checkbox" class="form-check-input" name="delete_waifu_{{ w.id }}"> Delete
@@ -231,6 +243,18 @@
             <div class="mb-2">
                 <label>Note</label>
                 <textarea name="husbando_note_{{ h.id }}" class="form-control" rows="2">{{ h.note }}</textarea>
+            </div>
+            <div class="mb-2">
+                <label>Rating (1-6 stars)</label>
+                <select name="husbando_rating_{{ h.id }}" class="form-control">
+                    <option value="">No rating</option>
+                    <option value="1" {% if h.rating == 1 %}selected{% endif %}>⭐ (1 star)</option>
+                    <option value="2" {% if h.rating == 2 %}selected{% endif %}>⭐⭐ (2 stars)</option>
+                    <option value="3" {% if h.rating == 3 %}selected{% endif %}>⭐⭐⭐ (3 stars)</option>
+                    <option value="4" {% if h.rating == 4 %}selected{% endif %}>⭐⭐⭐⭐ (4 stars)</option>
+                    <option value="5" {% if h.rating == 5 %}selected{% endif %}>⭐⭐⭐⭐⭐ (5 stars)</option>
+                    <option value="6" {% if h.rating == 6 %}selected{% endif %}>⭐⭐⭐⭐⭐⭐ (6 stars)</option>
+                </select>
             </div>
             <div class="text-end">
                 <label class="form-check-label text-danger">
@@ -264,6 +288,18 @@
                         <label>Note</label>
                         <textarea name="husbando_note" class="form-control" rows="2"></textarea>
                     </div>
+                    <div class="mb-2">
+                        <label>Rating (1-6 stars)</label>
+                        <select name="husbando_rating" class="form-control">
+                            <option value="">No rating</option>
+                            <option value="1">⭐ (1 star)</option>
+                            <option value="2">⭐⭐ (2 stars)</option>
+                            <option value="3">⭐⭐⭐ (3 stars)</option>
+                            <option value="4">⭐⭐⭐⭐ (4 stars)</option>
+                            <option value="5">⭐⭐⭐⭐⭐ (5 stars)</option>
+                            <option value="6">⭐⭐⭐⭐⭐⭐ (6 stars)</option>
+                        </select>
+                    </div>
                 </div>`;
             container.insertAdjacentHTML("beforeend", html);
         });
@@ -287,6 +323,18 @@
                     <div class="mb-2">
                         <label>Note</label>
                         <textarea name="waifu_note" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label>Rating (1-6 stars)</label>
+                        <select name="waifu_rating" class="form-control">
+                            <option value="">No rating</option>
+                            <option value="1">⭐ (1 star)</option>
+                            <option value="2">⭐⭐ (2 stars)</option>
+                            <option value="3">⭐⭐⭐ (3 stars)</option>
+                            <option value="4">⭐⭐⭐⭐ (4 stars)</option>
+                            <option value="5">⭐⭐⭐⭐⭐ (5 stars)</option>
+                            <option value="6">⭐⭐⭐⭐⭐⭐ (6 stars)</option>
+                        </select>
                     </div>
                 </div>`;
             container.insertAdjacentHTML("beforeend", html);

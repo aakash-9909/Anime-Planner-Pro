@@ -5,18 +5,41 @@
 {% block main %}
 <h2 class="mb-4 text-center">🌸 All Characters</h2>
 
-<!-- Search Form -->
-<form class="mb-4" method="get" action="{{ url_for('characters') }}">
-    <div class="input-group">
-        <input type="text" class="form-control" name="search" placeholder="Search by name" value="{{ search }}">
-        <button class="btn btn-outline-primary" type="submit">🔍 Search</button>
+<!-- Toggles and Search/Sort Button -->
+<div class="mb-4 d-flex justify-content-end align-items-center gap-3">
+    <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="searchSortBtn" data-bs-toggle="dropdown" aria-expanded="false">
+            🔍 Search & Sort
+        </button>
+        <div class="dropdown-menu p-3" aria-labelledby="searchSortBtn" style="min-width: 340px;">
+            <form method="get" action="{{ url_for('characters') }}" id="searchSortForm">
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="search" placeholder="Search by name" value="{{ search }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label mb-1">Sort by</label>
+                    <select class="form-select mb-2" name="sort">
+                        <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
+                        <option value="star" {% if sort_by == 'star' %}selected{% endif %}>Star</option>
+                        <option value="rating" {% if sort_by == 'rating' %}selected{% endif %}>Rating</option>
+                    </select>
+                    <select class="form-select" name="order">
+                        <option value="asc" {% if order == 'asc' %}selected{% endif %}>Ascending</option>
+                        <option value="desc" {% if order == 'desc' %}selected{% endif %}>Descending</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary w-100" type="submit">Apply</button>
+            </form>
+        </div>
     </div>
-</form>
-
-<!-- Crop Toggle -->
-<div class="mb-4 text-end">
-    <label class="form-check-label me-2" for="cropToggle">Crop:</label>
-    <input type="checkbox" class="form-check-input" id="cropToggle" checked>
+    {% if waifus or husbandos %}
+    <div class="d-flex align-items-center gap-3">
+        <label class="form-check-label me-2" for="toggleStarsCheckbox">Show Stars</label>
+        <input type="checkbox" id="toggleStarsCheckbox" class="form-check-input" style="width: 1.2em; height: 1.2em;">
+        <label class="form-check-label ms-3 me-2" for="cropToggle">Crop</label>
+        <input type="checkbox" class="form-check-input" id="cropToggle" checked>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Waifus -->
@@ -33,6 +56,13 @@
             </a>
             <div class="card-body text-center">
                 <h6 class="card-title mb-2">{{ w[1] }}</h6>
+                {% if w[7] %}
+                <div class="d-flex justify-content-center mb-2 star-badge d-none">
+                    <span style="background: #fff; border-radius: 1em; padding: 0.03em 0.25em; font-size: 0.85rem; color: gold; letter-spacing: 1px; box-shadow: 0 1px 4px rgba(0,0,0,0.10);">
+                        {{ w[7]|render_character_stars }}
+                    </span>
+                </div>
+                {% endif %}
                 <p class="card-text small fst-italic text-muted">{{ w[3][:80] }}{% if w[3]|length > 80 %}...{% endif %}</p>
                 <form method="POST" action="{{ url_for('toggle_star', character_type='waifu', char_id=w[0]) }}">
                     <button class="btn btn-sm btn-outline-warning">{{ '⭐' if w[4] else '☆' }}</button>
@@ -59,6 +89,13 @@
             </a>
             <div class="card-body text-center">
                 <h6 class="card-title mb-2">{{ h[1] }}</h6>
+                {% if h[7] %}
+                <div class="d-flex justify-content-center mb-2 star-badge d-none">
+                    <span style="background: #fff; border-radius: 1em; padding: 0.03em 0.25em; font-size: 0.85rem; color: gold; letter-spacing: 1px; box-shadow: 0 1px 4px rgba(0,0,0,0.10);">
+                        {{ h[7]|render_character_stars }}
+                    </span>
+                </div>
+                {% endif %}
                 <p class="card-text small fst-italic text-muted">{{ h[3][:80] }}{% if h[3]|length > 80 %}...{% endif %}</p>
                 <form method="POST" action="{{ url_for('toggle_star', character_type='husbando', char_id=h[0]) }}">
                     <button class="btn btn-sm btn-outline-warning">{{ '⭐' if h[4] else '☆' }}</button>
@@ -79,8 +116,8 @@
 
 {% block scripts %}
 <script>
-    // Toggle crop/contain for character images
     document.addEventListener('DOMContentLoaded', function() {
+        // Toggle crop/contain for character images
         const toggle = document.getElementById('cropToggle');
         function updateCrop() {
             const imgs = document.querySelectorAll('.card-img-top');
@@ -96,6 +133,15 @@
         }
         toggle.addEventListener('change', updateCrop);
         updateCrop();
+
+        // Toggle star badges
+        const toggleCheckbox = document.getElementById("toggleStarsCheckbox");
+        const starBadges = document.querySelectorAll('.star-badge');
+        if (toggleCheckbox) {
+            toggleCheckbox.addEventListener('change', function () {
+                starBadges.forEach(badge => badge.classList.toggle('d-none', !toggleCheckbox.checked));
+            });
+        }
     });
 </script>
 {% endblock %}

@@ -82,6 +82,7 @@ def init_db():
             sequel TEXT,
             details_url TEXT,
             background_url TEXT,
+            poster_url TEXT,
             user_id INTEGER,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
         )
@@ -130,6 +131,7 @@ def init_db():
             image TEXT,
             note TEXT,
             starred INTEGER DEFAULT 0,
+            rating INTEGER,
             FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
         )
     """)
@@ -141,12 +143,41 @@ def init_db():
             image TEXT,
             note TEXT,
             starred INTEGER DEFAULT 0,
+            rating INTEGER,
             FOREIGN KEY(anime_id) REFERENCES anime(id) ON DELETE CASCADE
         )
     """)
     conn.commit()
     db.close()
     conn.close()
+
+def migrate_db():
+    """Add rating column to existing tables if they don't exist"""
+    conn = get_db()
+    db = conn.cursor()
+    
+    try:
+        # Check if rating column exists in anime_waifus
+        db.execute("PRAGMA table_info(anime_waifus)")
+        columns = [column[1] for column in db.fetchall()]
+        if 'rating' not in columns:
+            print("Adding rating column to anime_waifus table...")
+            db.execute("ALTER TABLE anime_waifus ADD COLUMN rating INTEGER")
+        
+        # Check if rating column exists in anime_husbandos
+        db.execute("PRAGMA table_info(anime_husbandos)")
+        columns = [column[1] for column in db.fetchall()]
+        if 'rating' not in columns:
+            print("Adding rating column to anime_husbandos table...")
+            db.execute("ALTER TABLE anime_husbandos ADD COLUMN rating INTEGER")
+        
+        conn.commit()
+        print("Database migration completed successfully!")
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        db.close()
+        conn.close()
 
 @app.route("/")
 def index():
@@ -183,6 +214,7 @@ def add():
         date = request.form.get("date")
         sequel = request.form.get("sequel")
         background_url = request.form.get("background_url")
+        poster_url = request.form.get("poster_url")  # NEW: Get poster URL from form
         no_date = request.form.get("no_date")
 
         if not title:
@@ -198,20 +230,16 @@ def add():
         db = conn.cursor()
         user_id = session.get("user_id")
 
+        # --- Handle poster upload ---
         poster_file = request.files.get("poster_upload") if "poster_upload" in request.files else None
-        poster_url = None
-        details_url = None  # Always define details_url
         if poster_file and poster_file.filename:
             filename = secure_filename(poster_file.filename)
             save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
             poster_file.save(save_path)
             poster_url = f"uploads/{filename}"
-            details_url = poster_url
-        # If not uploaded, check for details_url in form (optional)
-        if not details_url:
-            details_url = request.form.get("details_url") or None
+        # If no file uploaded, use the URL from form (could be a URL or local path)
 
-        # --- Fix background image upload ---
+        # --- Handle background image upload ---
         background_file = request.files.get("background_upload") if "background_upload" in request.files else None
         if background_file and background_file.filename:
             filename = secure_filename(background_file.filename)
@@ -220,9 +248,9 @@ def add():
             background_url = f"uploads/{filename}"
 
         db.execute("""
-            INSERT INTO anime (title, rating, thoughts, date, sequel, details_url, background_url, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (title, rating, thoughts, date, sequel, details_url, background_url, user_id))
+            INSERT INTO anime (title, rating, thoughts, date, sequel, details_url, background_url, poster_url, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (title, rating, thoughts, date, sequel, None, background_url, poster_url, user_id))
         anime_id = db.lastrowid
 
         # --- Remove automatic anime_detail creation ---
@@ -269,13 +297,23 @@ def preview():
     order_clause = "ORDER BY a.rating DESC" if sort_by_rating else "ORDER BY a.id DESC"
     
     db.execute(f"""
-        SELECT a.*, d.poster_url
+        SELECT a.*, d.poster_url as detail_poster_url
         FROM anime a
         LEFT JOIN anime_detail d ON a.id = d.anime_id
         WHERE a.user_id = ?
         {order_clause}
     """, (user_id,))
     anime_list = db.fetchall()
+
+    # Process poster priority: anime.poster_url takes priority over detail.poster_url
+    for anime in anime_list:
+        # For preview page: anime.poster_url (from add) takes priority over detail.poster_url
+        if anime.get('poster_url'):
+            anime['display_poster_url'] = anime['poster_url']
+        elif anime.get('detail_poster_url'):
+            anime['display_poster_url'] = anime['detail_poster_url']
+        else:
+            anime['display_poster_url'] = None
 
     # Get anime IDs that have details
     db.execute("SELECT anime_id FROM anime_detail ad JOIN anime a ON ad.anime_id = a.id WHERE a.user_id = ?", (user_id,))
@@ -297,12 +335,31 @@ def edit(anime_id):
         date = request.form.get("date")
         sequel = request.form.get("sequel")
         background_url = request.form.get("background_url")
+        poster_url = request.form.get("poster_url")  # NEW: Get poster URL from form
         no_date = request.form.get("no_date")
+
+        # Handle rating - allow blank values
+        if rating and rating.strip():
+            try:
+                rating = float(rating)
+            except ValueError:
+                rating = None
+        else:
+            rating = None
 
         if no_date:
             date = None
         elif not date:
             date = datetime.today().strftime('%Y-%m-%d')
+
+        # --- Handle poster upload ---
+        poster_file = request.files.get("poster_upload") if "poster_upload" in request.files else None
+        if poster_file and poster_file.filename:
+            filename = secure_filename(poster_file.filename)
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            poster_file.save(save_path)
+            poster_url = f"uploads/{filename}"
+        # If no file uploaded, use the URL from form (could be a URL or local path)
 
         # --- Handle background image upload ---
         background_file = request.files.get("background_upload") if "background_upload" in request.files else None
@@ -316,12 +373,12 @@ def edit(anime_id):
         conn = get_db()
         db = conn.cursor()
         
-        # Update main anime table (without details_url)
+        # Update main anime table (including poster_url)
         db.execute("""
             UPDATE anime
-            SET title = ?, rating = ?, thoughts = ?, date = ?, sequel = ?, background_url = ?
+            SET title = ?, rating = ?, thoughts = ?, date = ?, sequel = ?, background_url = ?, poster_url = ?
             WHERE id = ? AND user_id = ?
-        """, (title, rating, thoughts, date, sequel, background_url, anime_id, user_id))
+        """, (title, rating, thoughts, date, sequel, background_url, poster_url, anime_id, user_id))
 
         if sequel:
             db.execute("INSERT INTO sequel (name) VALUES (?)", (sequel,))
@@ -418,6 +475,18 @@ def render_stars(value):
         return "⭐" * full + ("½" if half else "")
     except:
         return "N/A"
+
+@app.template_filter('render_character_stars')
+def render_character_stars(value):
+    try:
+        value = int(value)
+        if 1 <= value <= 6:
+            return "⭐" * value
+        else:
+            return "N/A"
+    except:
+        return "N/A"
+
 @app.route("/detail/<int:anime_id>")
 @login_required
 def detail(anime_id):
@@ -438,6 +507,27 @@ def detail(anime_id):
     # Fetch detailed info
     db.execute("SELECT * FROM anime_detail WHERE anime_id = ?", (anime_id,))
     detail = db.fetchone()
+
+    # Process poster priority for detail page: detail.poster_url takes priority over anime.poster_url
+    display_poster_url = None
+    print(f"Debug: anime[9] (anime.poster_url) = {anime[9]}")
+    print(f"Debug: detail[10] (detail.poster_url) = {detail[10] if detail else 'No detail record'}")
+    
+    if detail and detail[10] and isinstance(detail[10], str) and detail[10].strip():  # detail.poster_url (not empty)
+        display_poster_url = detail[10].strip()
+        print(f"Debug: Using detail.poster_url: {display_poster_url}")
+    elif anime[9] and isinstance(anime[9], str) and anime[9].strip():  # anime.poster_url (not empty)
+        display_poster_url = anime[9].strip()
+        print(f"Debug: Using anime.poster_url: {display_poster_url}")
+    elif anime[9] and not isinstance(anime[9], str):  # fallback if poster_url is not a string (shouldn't happen, but safe)
+        display_poster_url = str(anime[9])
+        print(f"Debug: Using anime.poster_url (forced str): {display_poster_url}")
+    else:
+        print("Debug: No poster URL found")
+    
+    # Ensure display_poster_url is a string or None
+    if display_poster_url is not None and not isinstance(display_poster_url, str):
+        display_poster_url = str(display_poster_url)
 
     # Decode image list
     image_urls = []
@@ -472,12 +562,12 @@ def detail(anime_id):
             "story": ep_rating_story
         })
     # Fetch waifus
-    db.execute("SELECT name, image, note FROM anime_waifus WHERE anime_id = ?", (anime_id,))
-    waifus = [{"name": row[0], "image": row[1], "note": row[2]} for row in db.fetchall()]
+    db.execute("SELECT id, name, image, note, rating FROM anime_waifus WHERE anime_id = ?", (anime_id,))
+    existing_waifus = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3], "rating": row[4]} for row in db.fetchall()]
 
     # Fetch husbandos
-    db.execute("SELECT name, image, note FROM anime_husbandos WHERE anime_id = ?", (anime_id,))
-    husbandos = [{"name": row[0], "image": row[1], "note": row[2]} for row in db.fetchall()]
+    db.execute("SELECT id, name, image, note, rating FROM anime_husbandos WHERE anime_id = ?", (anime_id,))
+    existing_husbandos = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3], "rating": row[4]} for row in db.fetchall()]
 
     db.close()
     conn.close()
@@ -486,10 +576,11 @@ def detail(anime_id):
     "detail.html",
     anime=anime,
     detail=detail,
+    display_poster_url=display_poster_url,
     images=image_urls,
     episodes=episodes,
-    waifus=waifus,
-    husbandos=husbandos
+    waifus=existing_waifus,
+    husbandos=existing_husbandos
 )
 
 @app.route("/edit_detail/<int:anime_id>", methods=["GET", "POST"])
@@ -683,21 +774,28 @@ def edit_detail(anime_id):
                     waifu_file.save(save_path)
                     image = f"uploads/{filename}"
                 note = request.form.get(f"waifu_note_{wid}")
+                rating = request.form.get(f"waifu_rating_{wid}")
+                # Convert rating to integer if provided, otherwise None
+                rating = int(rating) if rating and rating.strip() and 1 <= int(rating) <= 6 else None
                 db.execute("""
                     UPDATE anime_waifus
-                    SET name = ?, image = ?, note = ?
+                    SET name = ?, image = ?, note = ?, rating = ?
                     WHERE id = ?
-                """, (name, image, note, wid))
+                """, (name, image, note, rating, wid))
 
         # === Insert new waifus ===
         new_waifu_names = request.form.getlist("waifu_name")
         new_waifu_images = request.form.getlist("waifu_image")
         new_waifu_notes = request.form.getlist("waifu_note")
+        new_waifu_ratings = request.form.getlist("waifu_rating")
         waifu_files = request.files.getlist("waifu_image_upload")
         for i in range(len(new_waifu_names)):
             name = new_waifu_names[i]
             image = new_waifu_images[i]
             note = new_waifu_notes[i]
+            rating = new_waifu_ratings[i] if i < len(new_waifu_ratings) else None
+            # Convert rating to integer if provided, otherwise None
+            rating = int(rating) if rating and rating.strip() and 1 <= int(rating) <= 6 else None
             # Handle waifu image upload
             if waifu_files and len(waifu_files) > i and waifu_files[i] and waifu_files[i].filename:
                 filename = secure_filename(waifu_files[i].filename)
@@ -706,9 +804,9 @@ def edit_detail(anime_id):
                 image = f"uploads/{filename}"
             if name:
                 db.execute("""
-                    INSERT INTO anime_waifus (anime_id, name, image, note)
-                    VALUES (?, ?, ?, ?)
-                """, (anime_id, name, image, note))
+                    INSERT INTO anime_waifus (anime_id, name, image, note, rating)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (anime_id, name, image, note, rating))
 
         # === Update or delete existing husbandos ===
         existing_husbando_ids = request.form.getlist("existing_husbando_ids")
@@ -727,21 +825,28 @@ def edit_detail(anime_id):
                     husbando_file.save(save_path)
                     image = f"uploads/{filename}"
                 note = request.form.get(f"husbando_note_{hid}")
+                rating = request.form.get(f"husbando_rating_{hid}")
+                # Convert rating to integer if provided, otherwise None
+                rating = int(rating) if rating and rating.strip() and 1 <= int(rating) <= 6 else None
                 db.execute("""
                     UPDATE anime_husbandos
-                    SET name = ?, image = ?, note = ?
+                    SET name = ?, image = ?, note = ?, rating = ?
                     WHERE id = ?
-                """, (name, image, note, hid))
+                """, (name, image, note, rating, hid))
 
         # === Insert new husbandos ===
         new_husbando_names = request.form.getlist("husbando_name")
         new_husbando_images = request.form.getlist("husbando_image")
         new_husbando_notes = request.form.getlist("husbando_note")
+        new_husbando_ratings = request.form.getlist("husbando_rating")
         husbando_files = request.files.getlist("husbando_image_upload")
         for i in range(len(new_husbando_names)):
             name = new_husbando_names[i]
             image = new_husbando_images[i]
             note = new_husbando_notes[i]
+            rating = new_husbando_ratings[i] if i < len(new_husbando_ratings) else None
+            # Convert rating to integer if provided, otherwise None
+            rating = int(rating) if rating and rating.strip() and 1 <= int(rating) <= 6 else None
             # Handle husbando image upload
             if husbando_files and len(husbando_files) > i and husbando_files[i] and husbando_files[i].filename:
                 filename = secure_filename(husbando_files[i].filename)
@@ -750,9 +855,9 @@ def edit_detail(anime_id):
                 image = f"uploads/{filename}"
             if name:
                 db.execute("""
-                    INSERT INTO anime_husbandos (anime_id, name, image, note)
-                    VALUES (?, ?, ?, ?)
-                """, (anime_id, name, image, note))
+                    INSERT INTO anime_husbandos (anime_id, name, image, note, rating)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (anime_id, name, image, note, rating))
 
         conn.commit()
         db.close()
@@ -797,11 +902,11 @@ def edit_detail(anime_id):
             "story": story
         })
 
-    db.execute("SELECT id, name, image, note FROM anime_waifus WHERE anime_id = ?", (anime_id,))
-    existing_waifus = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3]} for row in db.fetchall()]
+    db.execute("SELECT id, name, image, note, rating FROM anime_waifus WHERE anime_id = ?", (anime_id,))
+    existing_waifus = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3], "rating": row[4]} for row in db.fetchall()]
 
-    db.execute("SELECT id, name, image, note FROM anime_husbandos WHERE anime_id = ?", (anime_id,))
-    existing_husbandos = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3]} for row in db.fetchall()]
+    db.execute("SELECT id, name, image, note, rating FROM anime_husbandos WHERE anime_id = ?", (anime_id,))
+    existing_husbandos = [{"id": row[0], "name": row[1], "image": row[2], "note": row[3], "rating": row[4]} for row in db.fetchall()]
 
     db.close()
     conn.close()
@@ -824,14 +929,24 @@ def list_detail():
     user_id = session.get("user_id")
 
     db.execute("""
-        SELECT a.id, a.title, a.rating, a.thoughts,
-               d.extra_notes, d.poster_url, d.images
+        SELECT a.id, a.title, a.rating, a.thoughts, a.poster_url as anime_poster_url,
+               d.extra_notes, d.poster_url as detail_poster_url, d.images
         FROM anime a
         LEFT JOIN anime_detail d ON a.id = d.anime_id
         WHERE a.user_id = ?
         ORDER BY a.id DESC
     """, (user_id,))
     anime_list = db.fetchall()
+
+    # Process poster priority: detail.poster_url takes priority over anime.poster_url
+    for anime in anime_list:
+        # For list_detail page: detail.poster_url takes priority over anime.poster_url (same as detail page)
+        if anime.get('detail_poster_url') and isinstance(anime['detail_poster_url'], str) and anime['detail_poster_url'].strip():
+            anime['display_poster_url'] = anime['detail_poster_url'].strip()
+        elif anime.get('anime_poster_url') and isinstance(anime['anime_poster_url'], str) and anime['anime_poster_url'].strip():
+            anime['display_poster_url'] = anime['anime_poster_url'].strip()
+        else:
+            anime['display_poster_url'] = None
 
     # Safely process the 'images' JSON string in Python
     for anime in anime_list:
@@ -866,35 +981,59 @@ def json_loads_filter(s):
 @login_required
 def characters():
     search = request.args.get("search", "").strip()
+    sort_by = request.args.get("sort", "name")  # default: name
+    order = request.args.get("order", "asc")     # default: ascending
     query = "%" + search + "%" if search else "%"
     user_id = session.get("user_id")
+
+    # Validate parameters
+    if sort_by not in {"name", "star", "rating"}:
+        sort_by = "name"
+    if order not in {"asc", "desc"}:
+        order = "asc"
 
     conn = get_db()
     db = conn.cursor()
 
+    # Build sort clause
+    if sort_by == "star":
+        sort_clause = f"w.starred {order.upper()}, w.name ASC"
+    elif sort_by == "rating":
+        sort_clause = f"w.rating {order.upper()}, w.name ASC"
+    else:  # name
+        sort_clause = f"w.name {order.upper()}"
+
     # Fetch waifus (only from user's anime)
-    db.execute("""
-        SELECT w.id, w.name, w.image, w.note, w.starred, a.id, a.title
+    db.execute(f"""
+        SELECT w.id, w.name, w.image, w.note, w.starred, a.id, a.title, w.rating
         FROM anime_waifus w
         JOIN anime a ON w.anime_id = a.id
         WHERE w.name LIKE ? AND a.user_id = ?
-        ORDER BY w.starred DESC, w.name
+        ORDER BY {sort_clause}
     """, (query, user_id))
     waifus = db.fetchall()
 
+    # Build sort clause for husbandos
+    if sort_by == "star":
+        sort_clause = f"h.starred {order.upper()}, h.name ASC"
+    elif sort_by == "rating":
+        sort_clause = f"h.rating {order.upper()}, h.name ASC"
+    else:  # name
+        sort_clause = f"h.name {order.upper()}"
+
     # Fetch husbandos (only from user's anime)
-    db.execute("""
-        SELECT h.id, h.name, h.image, h.note, h.starred, a.id, a.title
+    db.execute(f"""
+        SELECT h.id, h.name, h.image, h.note, h.starred, a.id, a.title, h.rating
         FROM anime_husbandos h
         JOIN anime a ON h.anime_id = a.id
         WHERE h.name LIKE ? AND a.user_id = ?
-        ORDER BY h.starred DESC, h.name
+        ORDER BY {sort_clause}
     """, (query, user_id))
     husbandos = db.fetchall()
 
     db.close()
     conn.close()
-    return render_template("characters.html", waifus=waifus, husbandos=husbandos, search=search)
+    return render_template("characters.html", waifus=waifus, husbandos=husbandos, search=search, sort_by=sort_by, order=order)
 
 @app.route("/toggle_star/<string:character_type>/<int:char_id>", methods=["POST"])
 @login_required
@@ -1048,4 +1187,5 @@ def export_db():
 
 if __name__ == "__main__":
     init_db()
+    migrate_db()
     print("anime.db and all tables created!")

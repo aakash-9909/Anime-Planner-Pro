@@ -35,6 +35,23 @@
         </select>
     </div>
     <div class="mb-3">
+        <label for="poster_url" class="form-label">Poster Image (optional)</label>
+        <input type="text" class="form-control mb-1" id="poster_url" name="poster_url" value="{{ anime.poster_url }}" placeholder="Poster URL or local path">
+        <input type="file" class="form-control" id="poster_upload" name="poster_upload" accept="image/*">
+        <div class="form-text">You can provide a poster URL/path or upload a poster image from your computer.<br>
+        Current poster:
+        {% if anime.poster_url %}
+            {% if anime.poster_url.startswith('http') %}
+                <img src="{{ anime.poster_url }}" alt="Current Poster" class="img-fluid mt-2" style="max-height:120px;">
+            {% else %}
+                <img src="{{ url_for('static', filename=anime.poster_url) }}" alt="Current Poster" class="img-fluid mt-2" style="max-height:120px;">
+            {% endif %}
+        {% else %}
+            <span class="text-muted">No poster set</span>
+        {% endif %}
+        </div>
+    </div>
+    <div class="mb-3">
         <label for="background_url" class="form-label">Background Image URL (optional)</label>
         <input type="text" class="form-control" id="background_url" name="background_url" value="{{ anime.background_url }}">
         <input type="file" class="form-control mt-2" id="background_upload" name="background_upload" accept="image/*">

@@ -12,9 +12,9 @@
             {{ anime[1] }}
         </h2>
 
-        {% if detail and detail[10] %}
+        {% if display_poster_url %}
         <div style="max-width: 220px;" class="ms-auto">
-            <img src="{{ detail[10] if detail[10].startswith('http') else url_for('static', filename=detail[10]) }}" class="img-fluid rounded shadow" alt="Anime Poster">
+            <img src="{% if display_poster_url is string and display_poster_url|length > 0 and display_poster_url.startswith('http') %}{{ display_poster_url }}{% else %}{{ url_for('static', filename=display_poster_url) }}{% endif %}" class="img-fluid rounded shadow" alt="Anime Poster">
         </div>
         {% endif %}
     </div>
@@ -243,6 +243,13 @@
     }
     </style>
     {% endif %}
+{% if husbandos or waifus %}
+<div class="mb-3 d-flex justify-content-end align-items-center">
+    <label class="form-check-label me-2" for="toggleStarsCheckbox">Show Stars</label>
+    <input type="checkbox" id="toggleStarsCheckbox" class="form-check-input" style="width: 1.2em; height: 1.2em;">
+</div>
+{% endif %}
+
 {% if husbandos %}
 <div class="mb-5">
     <h5 class="fw-semibold mb-3 border-bottom pb-1" style="color: #e91e63;">
@@ -273,6 +280,13 @@
                  style="background-color: rgba(0, 0, 0, 0.6);"
                  title="{{ h.note }}">
                 {{ h.note[:60] }}{% if h.note|length > 60 %}...{% endif %}
+            </div>
+            {% endif %}
+            {% if h.rating %}
+            <div class="d-flex justify-content-end mt-1 star-badge d-none">
+                <span style="background: #fff; border-radius: 1em; padding: 0.03em 0.25em; font-size: 0.85rem; color: gold; letter-spacing: 1px; box-shadow: 0 1px 4px rgba(0,0,0,0.10);">
+                    {{ h.rating|render_character_stars }}
+                </span>
             </div>
             {% endif %}
         </div>
@@ -311,6 +325,13 @@
                  style="background-color: rgba(0, 0, 0, 0.6);"
                  title="{{ w.note }}">
                 {{ w.note[:60] }}{% if w.note|length > 60 %}...{% endif %}
+            </div>
+            {% endif %}
+            {% if w.rating %}
+            <div class="d-flex justify-content-end mt-1 star-badge d-none">
+                <span style="background: #fff; border-radius: 1em; padding: 0.03em 0.25em; font-size: 0.85rem; color: gold; letter-spacing: 1px; box-shadow: 0 1px 4px rgba(0,0,0,0.10);">
+                    {{ w.rating|render_character_stars }}
+                </span>
             </div>
             {% endif %}
         </div>
@@ -394,5 +415,16 @@
     }
 </script>
 
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const toggleCheckbox = document.getElementById("toggleStarsCheckbox");
+    const starBadges = document.querySelectorAll('.star-badge');
+    if (toggleCheckbox) {
+        toggleCheckbox.addEventListener('change', function () {
+            starBadges.forEach(badge => badge.classList.toggle('d-none', !toggleCheckbox.checked));
+        });
+    }
+});
+</script>
 
 {% endblock %}
