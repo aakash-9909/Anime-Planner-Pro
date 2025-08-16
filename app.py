@@ -21,6 +21,10 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Configure file upload limits (increase for larger files)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['MAX_CONTENT_PATH'] = None
+
 # Configure session to use filesystem
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
@@ -60,6 +64,11 @@ def datetimeformat(value, format='%b %Y'):
         return datetime.strptime(value, '%Y-%m-%d').strftime(format)
     except:
         return value
+
+# Error handler for file size issues
+@app.errorhandler(413)
+def too_large(e):
+    return "File too large. Maximum file size is 50MB.", 413
 
 # Create tables with SQLite syntax
 def init_db():
@@ -620,10 +629,24 @@ def edit_detail(anime_id):
         uploaded_paths = []
         
         print(f"Debug: Found {len(uploaded_files)} uploaded files")
+        print(f"Debug: Request files keys: {list(request.files.keys())}")
         
-        for file in uploaded_files:
+        for i, file in enumerate(uploaded_files):
             if file and file.filename:
                 try:
+                    # Check file size before processing
+                    file.seek(0, 2)  # Seek to end
+                    file_size = file.tell()
+                    file.seek(0)  # Reset to beginning
+                    
+                    print(f"Debug: Processing file {i}: {file.filename}, size: {file_size} bytes")
+                    
+                    if file_size > app.config['MAX_CONTENT_LENGTH']:
+                        error_msg = f"File {file.filename} is too large ({file_size} bytes). Max allowed: {app.config['MAX_CONTENT_LENGTH']} bytes"
+                        print(f"Debug: {error_msg}")
+                        flash(error_msg)
+                        continue
+                    
                     filename = secure_filename(file.filename)
                     save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
                     print(f"Debug: Saving file {filename} to {save_path}")
@@ -723,25 +746,31 @@ def edit_detail(anime_id):
         new_episode_overalls = request.form.getlist("episode_overall")
         new_episode_animations = request.form.getlist("episode_animation")
         new_episode_stories = request.form.getlist("episode_story")
-        # For new episodes, handle multiple files per episode
-        new_episode_files = request.files.getlist("episode_image_upload")
-        file_idx = 0
+        
+        # Handle episode image uploads - get all files for each episode
         for i in range(len(new_episode_numbers)):
             try:
                 ep_num = int(new_episode_numbers[i])
                 ep_note = new_episode_notes[i]
                 ep_images_list = [url.strip() for url in new_episode_images[i].split(",") if url.strip()]
-                # Handle episode image upload for new episodes
-                # Try to match files to episodes by order
-                episode_files = []
-                while file_idx < len(new_episode_files) and new_episode_files[file_idx] and new_episode_files[file_idx].filename:
-                    filename = secure_filename(new_episode_files[file_idx].filename)
-                    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                    new_episode_files[file_idx].save(save_path)
-                    ep_images_list.append(f"uploads/{filename}")
-                    file_idx += 1
-                    # Only one file per episode unless user selects multiple for one episode
-                    break
+                
+                # Get all uploaded files for this specific episode
+                episode_files = request.files.getlist(f"episode_image_upload_{i}")
+                print(f"Debug: Episode {ep_num}: Found {len(episode_files)} uploaded files")
+                
+                # Process all uploaded files for this episode
+                for file in episode_files:
+                    if file and file.filename:
+                        try:
+                            filename = secure_filename(file.filename)
+                            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                            file.save(save_path)
+                            ep_images_list.append(f"uploads/{filename}")
+                            print(f"Debug: Saved episode image {filename} for episode {ep_num}")
+                        except Exception as e:
+                            print(f"Debug: Error saving episode image {file.filename}: {e}")
+                            flash(f"Error uploading episode image {file.filename}: {str(e)}")
+                
                 ep_images = json.dumps(ep_images_list)
                 ep_overall = float(new_episode_overalls[i]) if new_episode_overalls[i] and new_episode_overalls[i].strip() else None
                 ep_animation = float(new_episode_animations[i]) if new_episode_animations[i] and new_episode_animations[i].strip() else None
@@ -756,6 +785,7 @@ def edit_detail(anime_id):
                     anime_id, ep_num, ep_note, ep_images, ep_overall, ep_animation, ep_story))
             except Exception as e:
                 print(f"Skipping new episode {i}: {e}")
+                flash(f"Error processing episode {i}: {str(e)}")
 
         # === Update or delete existing waifus ===
         existing_waifu_ids = request.form.getlist("existing_waifu_ids")
@@ -788,7 +818,7 @@ def edit_detail(anime_id):
         new_waifu_images = request.form.getlist("waifu_image")
         new_waifu_notes = request.form.getlist("waifu_note")
         new_waifu_ratings = request.form.getlist("waifu_rating")
-        waifu_files = request.files.getlist("waifu_image_upload")
+        
         for i in range(len(new_waifu_names)):
             name = new_waifu_names[i]
             image = new_waifu_images[i]
@@ -796,12 +826,24 @@ def edit_detail(anime_id):
             rating = new_waifu_ratings[i] if i < len(new_waifu_ratings) else None
             # Convert rating to integer if provided, otherwise None
             rating = int(rating) if rating and rating.strip() and 1 <= int(rating) <= 6 else None
-            # Handle waifu image upload
-            if waifu_files and len(waifu_files) > i and waifu_files[i] and waifu_files[i].filename:
-                filename = secure_filename(waifu_files[i].filename)
-                save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                waifu_files[i].save(save_path)
-                image = f"uploads/{filename}"
+            
+            # Handle waifu image upload - get files for this specific waifu
+            waifu_files = request.files.getlist(f"waifu_image_upload_{i}")
+            if waifu_files and any(f.filename for f in waifu_files if f):
+                # Use the first uploaded file if multiple are provided
+                for file in waifu_files:
+                    if file and file.filename:
+                        try:
+                            filename = secure_filename(file.filename)
+                            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                            file.save(save_path)
+                            image = f"uploads/{filename}"
+                            print(f"Debug: Saved waifu image {filename}")
+                            break  # Use first valid file
+                        except Exception as e:
+                            print(f"Debug: Error saving waifu image {file.filename}: {e}")
+                            flash(f"Error uploading waifu image {file.filename}: {str(e)}")
+            
             if name:
                 db.execute("""
                     INSERT INTO anime_waifus (anime_id, name, image, note, rating)
@@ -839,7 +881,7 @@ def edit_detail(anime_id):
         new_husbando_images = request.form.getlist("husbando_image")
         new_husbando_notes = request.form.getlist("husbando_note")
         new_husbando_ratings = request.form.getlist("husbando_rating")
-        husbando_files = request.files.getlist("husbando_image_upload")
+        
         for i in range(len(new_husbando_names)):
             name = new_husbando_names[i]
             image = new_husbando_images[i]
@@ -847,12 +889,24 @@ def edit_detail(anime_id):
             rating = new_husbando_ratings[i] if i < len(new_husbando_ratings) else None
             # Convert rating to integer if provided, otherwise None
             rating = int(rating) if rating and rating.strip() and 1 <= int(rating) <= 6 else None
-            # Handle husbando image upload
-            if husbando_files and len(husbando_files) > i and husbando_files[i] and husbando_files[i].filename:
-                filename = secure_filename(husbando_files[i].filename)
-                save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                husbando_files[i].save(save_path)
-                image = f"uploads/{filename}"
+            
+            # Handle husbando image upload - get files for this specific husbando
+            husbando_files = request.files.getlist(f"husbando_image_upload_{i}")
+            if husbando_files and any(f.filename for f in husbando_files if f):
+                # Use the first uploaded file if multiple are provided
+                for file in husbando_files:
+                    if file and file.filename:
+                        try:
+                            filename = secure_filename(file.filename)
+                            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                            file.save(save_path)
+                            image = f"uploads/{filename}"
+                            print(f"Debug: Saved husbando image {filename}")
+                            break  # Use first valid file
+                        except Exception as e:
+                            print(f"Debug: Error saving husbando image {file.filename}: {e}")
+                            flash(f"Error uploading husbando image {file.filename}: {str(e)}")
+            
             if name:
                 db.execute("""
                     INSERT INTO anime_husbandos (anime_id, name, image, note, rating)
